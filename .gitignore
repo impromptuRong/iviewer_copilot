@@ -1,0 +1,13 @@
+abc
+databases
+dbbackup
+__pycache__
+.ipynb_checkpoints
+z.quickstart.txt
+selected_models
+slides_folder
+ckpts
+*.sh
+z.*
+.DS_Store
+.env

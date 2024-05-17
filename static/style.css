@@ -1,0 +1,170 @@
+html {
+    overflow: hidden;
+}
+
+body {
+    margin: 0; 
+    padding: 0;
+}
+
+div#toolbars {
+    position: relative;
+    width: 100%;
+    height: 30px;  /*5%;*/
+    border: 1px solid;
+    display: flex;
+}
+
+div#osd {
+    position: relative;
+    top: 0%;
+    left: 0%;
+    width: 100%;
+    height: 100%;
+}
+
+div#view {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 95%;
+    background-color: black;
+    color: white;
+    border: 1px solid #000;
+}
+
+div#view1 {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 50%;
+    height: 95%;
+    background-color: black;
+    color: white;
+    border: 1px solid #000;
+    display: inline-block;
+}
+
+div#view2 {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    width: 50%;
+    height: 95%;
+    background-color: black;
+    color: white;
+    border: 1px solid #000;
+    display: inline-block;
+}
+
+div#view.fullpage {
+    left: 0%;
+    border: 0;
+}
+
+.flexible-div2 {
+    position: relative;
+    flex: 1; /* Use flex property to make the divs flexible */
+    margin: 0px; /* Add some margin for spacing */
+    background-color: lightblue; /* Just for visualization */
+}
+
+.inner {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-around;
+    align-items: center;
+    height: 80%; /* Take up full height of the outer div */
+    overflow: hidden; /* Hide overflow content if any */
+}
+
+.popup {
+    display: none;
+    position: fixed;
+    background-color: #f9f9f9;  /* #ccc */
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    top: 5%;
+    left: 10%;
+    margin: 4px;
+    padding: 4px;
+    overflow-y: auto;
+    justify-content: top;
+    align-items: left;
+    font-size: 14px;
+    z-index: 9999;
+}
+
+.popup-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.popup-header h2 {
+    font-size: 16px;
+    margin: 0;
+}
+
+.close-btn {
+    cursor: pointer;
+    border: none;
+    background: none;
+    font-size: 16px;
+}
+
+#options, #checkboxes {
+    margin-bottom: 4px;
+    background-color: white;
+}
+
+.input-readonly:focus {
+    outline: none;
+}
+ 
+.r6o-editor {
+    width: 500px !important;
+}
+
+.r6o-editor-inner .widget {
+    display: inline;
+    cursor: move;
+}
+
+.r6o-editor-inner .widget:nth-last-child(2) {
+    /* footer takes 214 pixels, we constrain this part to .r6o-editor.width-214=286 */
+    display: inline-block;
+    width: 280px;
+    margin-left: 6px;
+    margin-right: 0px;   /* width 280+6=286 */
+    cursor: move;
+}
+
+.r6o-editor-inner .r6o-widget.comment.editable:nth-child(2) {
+    /* Hide Add a reply... */
+    display: none;
+}
+
+.r6o-editor-inner .r6o-footer {
+    display: inline-block;
+    width: 214px;
+}
+
+.delete-annotation {
+    display: inline-block !important;
+    position: initial !important;
+}
+
+.annotator {
+    font-size: small;
+    text-align: left;
+    margin-right: 5px;
+    display: inline;
+}
+
+.chatbox-widget {
+    height: 720px;
+}

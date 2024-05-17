@@ -1,0 +1,115 @@
+version: '3'
+
+networks:
+  iviewer-network:
+
+services:
+  redis:
+    image: redis:latest
+    container_name: iviewer-redis
+    networks:
+      - iviewer-network
+
+  deepzoom:
+    image: iviewer-deepzoom:latest
+    container_name: iviewer-deepzoom
+    build:
+      context: .
+      dockerfile: ./deepzoom/Dockerfile
+    ports:
+      - "10010:9010"
+    depends_on:
+      - redis
+    networks:
+      - iviewer-network
+    volumes:
+      - ${SLIDES_DIR}:/app/abc
+      - ${DATABASE_DIR}:/app/databases
+    environment:
+      - DATABASE_PATH=/app/databases
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  annotation:
+    image: iviewer-annotation:latest
+    container_name: iviewer-annotation
+    build:
+      context: .
+      dockerfile: ./annotation/Dockerfile
+    ports:
+      - "10020:9020"
+    depends_on:
+      - redis
+    networks:
+      - iviewer-network
+    volumes:
+      - ${SLIDES_DIR}:/app/abc
+      - ${DATABASE_DIR}:/app/databases
+    environment:
+      - DATABASE_PATH=/app/databases
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  hdyolo:
+    image: iviewer-hdyolo:latest
+    container_name: iviewer-hdyolo
+    build:
+      context: .
+      dockerfile: ./nuclei/Dockerfile.agent
+    depends_on:
+      - redis
+    networks:
+      - iviewer-network
+    volumes:
+      - ${SLIDES_DIR}:/app/abc
+      - ${DATABASE_DIR}:/app/databases
+    environment:
+      - DATABASE_PATH=/app/databases
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+  
+  nuclei:
+    image: iviewer-nuclei:latest
+    container_name: iviewer-nuclei
+    build:
+      context: .
+      dockerfile: ./nuclei/Dockerfile.queue
+    ports:
+      - "10030:9030"
+    depends_on:
+      - redis
+      - hdyolo
+    networks:
+      - iviewer-network
+    volumes:
+      - ${SLIDES_DIR}:/app/abc
+      - ${DATABASE_DIR}:/app/databases
+    environment:
+      - DATABASE_PATH=/app/databases
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  copilot:
+    image: iviewer-copilot:latest
+    container_name: iviewer-copilot
+    build:
+      context: .
+      dockerfile: ./copilot/Dockerfile
+    ports:
+      - "10040:9040"
+    depends_on:
+      - redis
+      - annotation
+    networks:
+      - iviewer-network
+    volumes:
+      - ${SLIDES_DIR}:/app/abc
+      - ${DATABASE_DIR}:/app/databases
+    environment:
+      - ANNOTATION_HOST=annotation
+      - ANNOTATION_PORT=9020
+      - OLLAMA_HOST=${OLLAMA_HOST}
+      - OLLAMA_PORT_CAPTION=${OLLAMA_PORT_CAPTION}
+      - OLLAMA_PORT_CHATBOT=${OLLAMA_PORT_CHATBOT}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - no_proxy="${no_proxy},${HOSTNAME}"

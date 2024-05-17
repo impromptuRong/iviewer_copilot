@@ -1,0 +1,248 @@
+<!-- <!doctype html> -->
+<meta charset="utf-8">
+<title>Slide Viewer</title>
+<meta name="viewport" content="user-scalable=no">
+
+<head>
+    <link rel="stylesheet" href="../static/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@recogito/annotorious@latest/dist/annotorious.min.css">
+
+    <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/konva/8.2.0/konva.min.js"></script>
+    <script type="text/javascript" src="../static/openseadragon/openseadragon.min.js"></script>
+    <script type="text/javascript" src="../static/OpenseadragonAnnotorious/openseadragon-annotorious.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious@latest/dist/annotorious.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-better-polygon@latest/dist/annotorious-better-polygon.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-selector-pack@latest/dist/annotorious-selector-pack.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-toolbar@latest/dist/annotorious-toolbar.min.js"></script>
+
+    <script type="text/javascript" src="../static/openseadragon-scalebar.js"></script>
+    <script type="text/javascript" src="../static/openseadragon-iviewer-annotation.js"></script>
+    <script type="text/javascript" src="../static/annotorious-editor.js"></script>
+    <script type="text/javascript" src="../static/utils.js"></script>
+
+    <script>
+        const imgIdMap = {"9388.svs": "test",}
+        const mpp = 0.25;
+        const imgName = "9388.svs";
+        const imgId = imgIdMap[imgName];
+        const userId = "1";
+        const userName = "user";
+        const userIdNameMap = {"1": "user", "yolov8-lung": "yolov8-lung",};
+        const colorPalette = new ColorPalette({
+            'bg': "#ffffff",
+            'tumor_nuclei': "#00ff00",
+            'stromal_nuclei': "#ff0000",
+            'immune_nuclei': "#0000ff",
+            'blood_cell': "#ff00ff",
+            'macrophage': "#ffff00",
+            'dead_nuclei': "#0094e1",
+            'other_nuclei': "#646464",
+        });
+        
+        const server = '0.0.0.0'
+        const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=abc%2F${imgName}&registry=slide`;
+        const paramAPI = `http://${server}:10010/proxy/params?image_id=${imgId}&registry=slide`;
+        const database_url = `http://${server}:10020/annotation`;
+        const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=abc%2F${imgName}&registry=yolov8-lung`;
+        const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=abc%2F${imgName}&registry=gpt4o`;
+        
+        // Function to populate options dynamically
+        function populateOptions(container, annotationLayer, annotatorsMap) {
+            container.innerHTML = ''; // Clear existing options
+            let activeIds = annotationLayer.activeAnnotators;
+            Object.entries(annotatorsMap).forEach(([key, value]) => {
+                let userId = key || '';
+                let userName = value || '<anonymous user>';
+
+                let option = document.createElement('option');
+                option.value = userId;
+                option.textContent = userName;
+                if (activeIds.has(userId)) {
+                    option.selected = true;
+                }
+                container.appendChild(option);
+            });
+            // Change ctrl+click to single click for multiple-selection
+            $('option').mousedown(function(e) {
+                e.preventDefault();
+                var originalScrollTop = $(this).parent().scrollTop();
+                console.log(originalScrollTop);
+                $(this).prop('selected', $(this).prop('selected') ? false : true);
+                var self = this;
+                $(this).parent().focus();
+                setTimeout(function() {
+                    $(self).parent().scrollTop(originalScrollTop);
+                }, 0);
+
+                return false;
+            });
+        }
+    </script>
+</head>
+
+<div id="toolbars">
+    <div id="manual-toolbar" class="inner"></div>
+    <div id="model-toolbar">
+        <button id="yolo" value="off" type="button">HDYolo</button>
+    </div>
+    <div id="coords">
+        <label for="coordX">x:</label>
+        <input type="text" id="coordX" class="input-readonly" name="coordX" size="10" readonly>
+        <label for="coordY">y:</label>
+        <input type="text" id="coordY" class="input-readonly" name="coordY" size="10" readonly>
+    </div>
+</div>
+
+<div id="layers" class="popup">
+    <div class="popup-header">
+        <h2>Select Annotators</h2>
+    </div>
+    <select multiple id="options">
+    </select>
+    <button id="okBtn">OK</button>
+</div>
+
+<div id="osd">
+    <div id="view"></div>
+</div>
+
+<script type="text/javascript">
+$(function() {
+    let maxZoomPixelRatio = mpp ? mpp / 0.25 * 1.1 : 1.1;
+    var viewer = new OpenSeadragon({
+        id: "view",
+        tileSources: displayAPI, 
+        prefixUrl: "../static/images/",
+        showNavigator: true,
+        showRotationControl: true,
+//         preserveViewport: true,
+//         preserveImageSizeOnResize: true,
+        animationTime: 0.5,
+        blendTime: 0.1,
+        constrainDuringPan: true,
+        maxZoomPixelRatio: maxZoomPixelRatio,
+        minZoomImageRatio: 1,
+        visibilityRatio: 1,
+        zoomPerScroll: 2,
+        timeout: 120000,
+    });
+
+    // Add yolo
+    viewer.addTiledImage({
+        tileSource: yoloAPI, 
+        opacity: 0.0,  // start with 0, openseadragon won't pull tiles if it's 0
+        x: 0,
+        y: 0,
+        width: 1,
+    });
+
+    var yoloBtn = document.getElementById("yolo");
+    yoloBtn.addEventListener("click", function () {
+        let nucleiImage = viewer.world.getItemAt(1);
+        if (yoloBtn.value == 'off') {
+            yoloBtn.value = 'on';
+            nucleiImage.setOpacity(1);
+            // If dropdown list is open, add row or check it.
+//             annotationLayer.addAnnotator('HDYolo');
+        } else {
+            yoloBtn.value = 'off';
+            nucleiImage.setOpacity(0);
+        }
+    });
+
+    // Add a IViewerAnnotation Layer (Konva + Annotorious)
+    var annotationLayer = new IViewerAnnotation(viewer, {
+        'layers': [{'capacity': 4096}],
+        'widgets': [
+            'COMMENT',
+            {
+                widget: 'TAG', 
+                vocabulary: colorPalette.labels(),
+            },
+            aiChatBox,
+        ],
+        'drawingTools': {
+            tools: ['rect', 'polygon', 'circle', 'ellipse', 'freehand'],
+            container: document.getElementById('manual-toolbar'), 
+        },
+    });
+    annotationLayer.colorPalette = colorPalette;  // Replace colorPalette with global one
+
+    annotationLayer.buildConnections(database_url, imgId);
+    annotationLayer.enableEditing(userId);
+    annotationLayer.draw();  // annotationLayer.hide();
+    // viewer.addHandler('viewport-change', annotationLayer.renderActive);
+
+    // Add a scale bar
+    viewer.scalebar({
+        pixelsPerMeter: mpp ? (1e6 / mpp) : 0,
+        xOffset: 10,
+        yOffset: 10,
+        barThickness: 3,
+        color: '#555555',
+        fontColor: '#333333',
+        backgroundColor: 'rgba(255, 255, 255, 0.5)',
+    });
+
+    // display coordinates
+    viewer.addHandler('open', function() {
+        var tracker = new OpenSeadragon.MouseTracker({
+            element: viewer.container,
+            moveHandler: function(event) {
+                if (!viewer.isFullScreen()) {
+                    var webPoint = event.position;
+                    var viewportPoint = viewer.viewport.pointFromPixel(webPoint);
+                    var imagePoint = viewer.world.getItemAt(0).viewportToImageCoordinates(viewportPoint);
+
+                    document.getElementById("coordX").value = imagePoint.x.toFixed(2);
+                    document.getElementById("coordY").value = imagePoint.y.toFixed(2);
+                }
+            }
+        });
+        tracker.setTracking(true);
+    });
+
+    // Add a button to control layer display.
+    let nucleiButton = new OpenSeadragon.Button({
+        tooltip: 'Display',
+        id: 'display_tree',
+        srcRest: "../static/images/button_rest.png",
+        srcGroup: "../static/images/button_grouphover.png",
+        srcHover: "../static/images/button_hover.png",
+        srcDown: "../static/images/button_pressed.png",
+    });
+    viewer.addControl(nucleiButton.element, { anchor: OpenSeadragon.ControlAnchor.TOP_LEFT });
+
+    // Link the button to a pop-out multi-selection window.
+    nucleiButton.addHandler('click', function(event) {
+        let api = annotationLayer.APIs.annoGetAnnotators;
+        getAnnotators(api).then(annotatorIds => {
+            // may has null in annotatorIds
+            let annotatorsMap = {};
+            annotatorIds.forEach(key => {
+                annotatorsMap[key] = userIdNameMap[key];
+            });
+            populateOptions(
+                document.getElementById('options'),
+                annotationLayer, annotatorsMap,
+            );
+            document.getElementById('layers').style.display = 'block';
+        })
+    });
+
+    document.getElementById('okBtn').addEventListener('click', function() {
+        let selectedAnnotators = new Set();
+        let options = document.getElementById('options').options;
+        for (let i = 0; i < options.length; i++) {
+            if (options[i].selected) {
+                selectedAnnotators.add(options[i].value);
+            }
+        }
+        console.log('Selected options: ', selectedAnnotators);
+        document.getElementById('layers').style.display = 'none';
+        annotationLayer.updateAnnotators(selectedAnnotators);
+    });
+});
+</script>

@@ -1,0 +1,9 @@
+dbbackup
+__pycache__
+.ipynb_checkpoints
+z.quickstart.txt
+slides_folder
+*.sh
+z.*
+.DS_Store
+
