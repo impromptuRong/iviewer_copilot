@@ -8,6 +8,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY utils ./utils
 COPY nuclei/. .
 
+# Download the onnx and TensorRT model weight
+RUN pip install gdown
+RUN mkdir -p /app/ckpts/yolov8-lung-nuclei
+RUN gdown 1TZhdmUfVe2Q78Vvu4Ex75Qt5geh0SsuZ -O /app/ckpts/yolov8-lung-nuclei/best.onnx
+RUN gdown 1q8KWSgxUZkv2Py1kFb5D-kL3mh2YcfRj -O /app/ckpts/yolov8-lung-nuclei/best.engine
+
 # RUN export no_proxy="localhost"
 
 CMD ["python", "app_consumer.py"]

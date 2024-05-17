@@ -38,12 +38,17 @@ class OllamaClient:
     
     def load_model(self, configs):
         self.model = configs.get('model', 'llama3')
-        # self.system = configs.get('system', None)
-        # assert model in client.list()
-        messages = [{'role': 'user', 'content': 'say hi'}]
+        # messages = [{'role': 'user', 'content': 'say hi'}]
         options = self.configs.get('options', {})
-        output = self.chat(messages, options=options)
-        print(f"Load Successfully: model={self.model}, options={options}. \n{output}")
+        try:
+            output = self.chat(messages=None, options=options)
+            print(f"Load Successfully: model={self.model}, options={options}. \n{output}")
+        except ollama.ResponseError as e:
+            print('Error:', e.error)
+            if e.status_code == 404:
+                self.client.pull(self.model)
+                output = self.chat(messages=None, options=options)
+                print(f"Load Successfully: model={self.model}, options={options}. \n{output}")
         
         return True
     
