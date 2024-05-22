@@ -112,4 +112,3 @@ services:
       - OLLAMA_PORT_CAPTION=${OLLAMA_PORT_CAPTION}
       - OLLAMA_PORT_CHATBOT=${OLLAMA_PORT_CHATBOT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      # - no_proxy="${no_proxy},${HOSTNAME}"

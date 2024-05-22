@@ -41,16 +41,13 @@ class OllamaClient:
         # messages = [{'role': 'user', 'content': 'say hi'}]
         options = self.configs.get('options', {})
         try:
+            self.client.pull(self.model)
             output = self.chat(messages=None, options=options)
             print(f"Load Successfully: model={self.model}, options={options}. \n{output}")
+            return True
         except ollama.ResponseError as e:
             print('Error:', e.error)
-            if e.status_code == 404:
-                self.client.pull(self.model)
-                output = self.chat(messages=None, options=options)
-                print(f"Load Successfully: model={self.model}, options={options}. \n{output}")
-        
-        return True
+            return False
     
     def stream(self, messages, options={}):
         print(options)
