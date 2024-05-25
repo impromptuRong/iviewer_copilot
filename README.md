@@ -26,3 +26,44 @@ docker compose up -d
 ```
 
 Then you can connect the backend API with frontend server. Or view a demo by opening the `./templates/index.html`
+
+```
+## Create a generator agent
+class GeneratorAgent:
+    def prepare_inputs(self, requests):
+        request_params = decode(requests)
+        boxes = get_bbox(request_params)
+        roi_image = get_roi_tile(request_params)
+        ...
+        
+        return {'roi_image': roi_image, 'boxes': boxes, ...}
+    
+    def analysis_offline(self, inputs):
+        serialized_item = serialize(inputs)
+        await redis_client.stream_push(registry, serialized_item)
+    
+    def analysis_online(self, inputs):
+        outputs = agents.analysis_online(inputs)
+        return Response(outputs)
+
+## Create a analysis agent
+class AnalysisAgent:
+    def predict(self, inputs):
+        return pipeline(inputs)
+    
+    def analysis_offline(self):
+        serialized_item = redis_client.stream_fetch(registry)
+        inputs = deserilize(serialized_item)
+        outputs = self.predict(inputs)
+        export_to_db(postprocess(outputs))
+
+    def analysis_online(self, inputs):
+        outputs = self.predict(inputs)
+        return postprocess(outputs)
+
+## Register model and generator
+MODEL_REGISTRY = ModelRegistry()
+MODEL_REGISTRY.register("registry_name", "model", AnalysisAgent)
+MODEL_REGISTRY.register("registry_name", "generator", GeneratorAgent)
+```
+

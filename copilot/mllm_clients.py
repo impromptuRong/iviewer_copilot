@@ -45,8 +45,8 @@ class OllamaClient:
             output = self.chat(messages=None, options=options)
             print(f"Load Successfully: model={self.model}, options={options}. \n{output}")
             return True
-        except ollama.ResponseError as e:
-            print('Error:', e.error)
+        except Exception as e:  # ollama.ResponseError as e:
+            print('Error:', e)
             return False
     
     def stream(self, messages, options={}):
