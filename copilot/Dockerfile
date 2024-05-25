@@ -11,4 +11,4 @@ COPY copilot/. .
 
 # RUN export no_proxy="localhost"
 
-CMD ["python", "app_copilot.py"]
+CMD ["uvicorn", "app_copilot:app", "--host", "0.0.0.0", "--port", "9040"]

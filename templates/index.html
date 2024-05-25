@@ -41,7 +41,7 @@
             'other_nuclei': "#646464",
         });
         
-        const server = '0.0.0.0'
+        const server = 'localhost'
         const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=abc%2F${imgName}&registry=slide`;
         const paramAPI = `http://${server}:10010/proxy/params?image_id=${imgId}&registry=slide`;
         const database_url = `http://${server}:10020/annotation`;

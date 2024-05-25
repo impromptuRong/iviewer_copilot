@@ -7,6 +7,7 @@ import pandas as pd
 import gradio as gr
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from functools import lru_cache
 
 from utils.simpletiff import SimpleTiff
@@ -312,6 +313,13 @@ with gr.Blocks(css=css) as demo:
 app = FastAPI()
 demo.queue(default_concurrency_limit=10)
 app = gr.mount_gradio_app(app, demo, path="/copilot")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust the allowed origins as needed
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 if __name__ == "__main__":
