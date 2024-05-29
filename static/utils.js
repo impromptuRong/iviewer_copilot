@@ -1,5 +1,3 @@
-// const { findLastKey } = require("lodash");
-
 // Color Palette
 class ColorPalette {
     constructor(colorPalette={}, defaultColor='#E8E613') {  // '#fd7e14'
@@ -31,7 +29,6 @@ class ColorPalette {
     }
 }
 
-
 function parseDatabaseAnnotation(ann, colorPalette) {
     let color = colorPalette.getColor(ann.label);
 
@@ -40,7 +37,7 @@ function parseDatabaseAnnotation(ann, colorPalette) {
     let polyY = ann.poly_y.split(',');
 
     let itemCfgs;
-    if (ann.poly_x.length === 0 || ann.poly_y.length === 0) {  // box
+    if (ann.poly_x.length === 0 || ann.poly_y.length === 0) { // box
         return {
             id: ann.id,
             label: ann.label,
@@ -56,7 +53,7 @@ function parseDatabaseAnnotation(ann, colorPalette) {
             width: parseFloat(ann.x1) - parseFloat(ann.x0),
             height: parseFloat(ann.y1) - parseFloat(ann.y0),
         };
-    } else if (polyX.length === 1 || polyY.length === 1) {  // Ellipse and circle
+    } else if (polyX.length === 1 || polyY.length === 1) { // Ellipse and circle
         let itemShape = parseFloat(polyX[0]) === parseFloat(polyY[0]) ? "circle" : "ellipse";
         return {
             id: ann.id,
@@ -73,7 +70,7 @@ function parseDatabaseAnnotation(ann, colorPalette) {
             radiusX: parseFloat(polyX[0]),
             radiusY: parseFloat(polyY[0]),
         };
-    } else {  // Polygon
+    } else { // Polygon
         let points = [];
         for (let i = 0; i < polyX.length && i < polyY.length; i++) {
             points.push(parseFloat(polyX[i]));
@@ -95,7 +92,7 @@ function parseDatabaseAnnotation(ann, colorPalette) {
     }
 }
 
-function konva2w3c(selectedShape){
+function konva2w3c(selectedShape) {
     // konva shapes: rect, ellipse, circle, polygon
     const { id, label, annotator, shape, description} = selectedShape.attrs;
     const bbox = { x0: selectedShape.ann.x0, y0: selectedShape.ann.y0, x1: selectedShape.ann.x1, y1: selectedShape.ann.y1 };
@@ -112,7 +109,7 @@ function konva2w3c(selectedShape){
                 "purpose": "tagging"
             });
         }
-    } 
+    }
     if (shape === "polygon") {
         const {points} = selectedShape.attrs;
         const pointsString = points.reduce((acc, val, index, array) => {
@@ -171,7 +168,6 @@ function konva2w3c(selectedShape){
                     "value" : annotator,
                     "purpose": "showannotator"
                 }
- 
             ],
             "target": {
                 "selector": {
@@ -186,7 +182,6 @@ function konva2w3c(selectedShape){
 
     return w3cAnnotation;
 }
-
 
 function w3c2konva(w3cAnnotation) {
     // Extract data from the provided W3C annotation format
@@ -206,7 +201,7 @@ function w3c2konva(w3cAnnotation) {
     var currentReplies = w3cAnnotation ? w3cAnnotation.body.filter(function(b) {
         return b.purpose == 'replying';
     }) : [];
-    
+
     description = '';
     console.log("length", currentDes.length, currentReplies.length);
     if (currentDes && currentDes.length > 0) {
@@ -215,7 +210,7 @@ function w3c2konva(w3cAnnotation) {
             return item.value;
         }).join('\n');
     }
-    if (currentDes.length > 0 && currentReplies.length > 0){
+    if (currentDes.length > 0 && currentReplies.length > 0) {
         description += '\n';
     }
     if (currentReplies.length > 0) {
@@ -385,7 +380,6 @@ function w3c2konva(w3cAnnotation) {
     return convertedObject;
 }
 
-
 function createAnnotation(api, query) {
     console.log("createAnnotation", api, query);
     return fetch(api, {
@@ -405,7 +399,6 @@ function createAnnotation(api, query) {
     });
 }
 
-
 function readAnnotation(api) {
     console.log("readAnnotation", api);
     return fetch(api, {
@@ -423,7 +416,6 @@ function readAnnotation(api) {
         throw error;
     });
 }
-
 
 function updateAnnotation(api, query) {
     console.log("updateAnnotation", api, query);
@@ -444,7 +436,6 @@ function updateAnnotation(api, query) {
     });
 }
 
-
 function deleteAnnotation(api) {
     console.log("deleteAnnotation", api);
     return fetch(api, {
@@ -463,7 +454,6 @@ function deleteAnnotation(api) {
     });
 }
 
-
 function searchAnnotations(api, query) {
     return fetch(api, {
         method: 'POST',
@@ -479,7 +469,7 @@ function searchAnnotations(api, query) {
     });
 }
 
-function countAnnotations(api){
+function countAnnotations(api) {
     return fetch(api, {
         method: 'POST',
         headers: {
@@ -490,13 +480,12 @@ function countAnnotations(api){
         if (!response.ok) {
             throw new Error('Network response was not ok');
         }
-        return response.json();  
+        return response.json();
     }).catch(error => {
         console.error('There was a problem with the fetch operation:', error);
         throw error;
     });
 }
-
 
 function getAnnotators(api) {
     return fetch(api, {
@@ -514,7 +503,6 @@ function getAnnotators(api) {
         throw error;
     });
 }
-
 
 function getAIDescription(api, query) {
     console.log("aiGeneration", api, query);
@@ -536,7 +524,7 @@ function getAIDescription(api, query) {
 
 function getCurrentViewport(viewer) {
     // Get the current viewport rectangle
-    if (!viewer.world.getItemCount()){
+    if (!viewer.world.getItemCount()) {
         return null;
     }
     let slideImage = viewer.world.getItemAt(0);
@@ -555,11 +543,10 @@ function getCurrentViewport(viewer) {
     };
     // console.log('Bbox:', bbox, this._viewer.viewport.getZoom(), viewer.viewport.getCenter());
     return bbox;
-
 }
 
 function drawNUpdateDatatable(api, query, colorPalette){
-    if (query.annotator.length > 0){ //only draw rows with selected manual annotator in the table
+    if (query.annotator.length > 0) { //only draw rows with selected manual annotator in the table
         searchAnnotations(api, query).then(ann => {
             if ($.fn.DataTable.isDataTable('#dataTable')) {
                 $('#dataTable').DataTable().clear().destroy();
@@ -606,24 +593,23 @@ function drawNUpdateDatatable(api, query, colorPalette){
                         }
                     ]
                 });
-        
-                $('#dataTable tbody').on('click', 'td:nth-child(5)', function () {
 
-                    var coordinateStr = $(this).closest('tr').find('td:nth-child(4)').text();// Get the text content of the clicked cell
+                $('#dataTable tbody').on('click', 'td:nth-child(5)', function () {
+                    var coordinateStr = $(this).closest('tr').find('td:nth-child(4)').text(); // Get the text content of the clicked cell
                     var coordinates = coordinateStr.substring(1, coordinateStr.length - 1).split(', '); // Parse coordinates from string
                     var x0 = parseFloat(coordinates[0]);
                     var x1 = parseFloat(coordinates[1]);
                     var y0 = parseFloat(coordinates[2]);
                     var y1 = parseFloat(coordinates[3]);
-            
-                var viewportTopLeft = leftViewer.viewport.imageToViewportCoordinates(
+
+                    var viewportTopLeft = leftViewer.viewport.imageToViewportCoordinates(
                         new OpenSeadragon.Point(x0, y0),
                     );
-            
+
                     var viewportBottomRight = leftViewer.viewport.imageToViewportCoordinates(
                         new OpenSeadragon.Point(x1, y1)
                     );
-            
+
                     var bounds = new OpenSeadragon.Rect(
                         viewportTopLeft.x,
                         viewportTopLeft.y,
@@ -650,7 +636,7 @@ function drawNUpdateDatatable(api, query, colorPalette){
                 });
             }
         });
-    }else{
+    } else {
         if ($.fn.DataTable.isDataTable('#dataTable')) {
             $('#dataTable').DataTable().clear().destroy();
         }
@@ -659,7 +645,6 @@ function drawNUpdateDatatable(api, query, colorPalette){
 
 function downloadAllAsCSV(annotations) {
     // Convert annotations to CSV format
-
     var headerRow = ['Annotator', 'Description', 'Label', 
                      'x0', 'y0', 'x1', 'y1', 'xc', 'yc',
                      'poly_x', 'poly_y'];
@@ -679,12 +664,10 @@ function downloadAllAsCSV(annotations) {
             annotation.poly_y
         ].map(escapeCSV).join(',');
     });
-   
-    //    var headerString = '"' + headerRow.join('","') + '"';
-    //    var csvDataString = csvData.join('\n');
-   
-    //    var csvString = headerString + '\n' + csvDataString;
-       
+
+    // var headerString = '"' + headerRow.join('","') + '"';
+    // var csvDataString = csvData.join('\n');
+    // var csvString = headerString + '\n' + csvDataString;
     var csvString = ['"' + headerRow.join('","') + '"'].concat(csvData).join('\n');
     // Create a Blob containing the CSV data
     var blob = new Blob([csvString], { type: 'text/csv' });

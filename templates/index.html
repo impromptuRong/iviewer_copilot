@@ -26,6 +26,7 @@
         const imgIdMap = {"9388.svs": "test",}
         const mpp = 0.25;
         const imgName = "9388.svs";
+        const slideFolder = "abc";
         const imgId = imgIdMap[imgName];
         const userId = "1";
         const userName = "user";
@@ -40,24 +41,25 @@
             'dead_nuclei': "#0094e1",
             'other_nuclei': "#646464",
         });
-        
+
         const server = 'localhost'
-        const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=abc%2F${imgName}&registry=slide`;
+        const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=slide`;
         const paramAPI = `http://${server}:10010/proxy/params?image_id=${imgId}&registry=slide`;
-        const database_url = `http://${server}:10020/annotation`;
-        const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=abc%2F${imgName}&registry=yolov8-lung`;
-        const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=abc%2F${imgName}&registry=gpt4o`;
-        const createDB = `http://${server}:10020/annotation/create?image_id=${imgId}`;
-        const getAnnotator = `http://${server}:10020/annotation/annotators?image_id=${imgId}`;
-        const getLabels = `http://${server}:10020/annotation/labels?image_id=${imgId}`;
-        const insert = `http://${server}:10020/annotation/insert?image_id=${imgId}`;
-        const read = `http://${server}:10020/annotation/cread?image_id=${imgId}`;
-        const update = `http://${server}:10020/annotation/update?image_id=${imgId}&item_id=`;
-        const deleteanno = `http://${server}:10020/annotation/delete?image_id=${imgId}&item_id=`;
-        const search = `http://${server}:10020/annotation/search?image_id=${imgId}`;
-        const stream = `ws://${server}:10020/annotation/stream?image_id=${imgId}`;
-        const count = `http://${server}:10020/annotation/count?image_id=${imgId}`;
-      
+        const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=yolov8-lung`;
+        const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=gpt4o`;
+
+        const database_url = `${server}:10020/annotation`;
+        const createDB = `http://${database_url}/create?image_id=${imgId}`;
+        const getAnnotator = `http://${database_url}/annotators?image_id=${imgId}`;
+        const getLabels = `http://${database_url}/labels?image_id=${imgId}`;
+        const insert = `http://${database_url}/insert?image_id=${imgId}`;
+        const read = `http://${database_url}/read?image_id=${imgId}`;
+        const update = `http://${database_url}/update?image_id=${imgId}&item_id=`;
+        const deleteanno = `http://${database_url}/delete?image_id=${imgId}&item_id=`;
+        const search = `http://${database_url}/search?image_id=${imgId}`;
+        const stream = `ws://${database_url}/stream?image_id=${imgId}`;
+        const count = `http://${database_url}/count?image_id=${imgId}`;
+
         // Function to populate options dynamically
         function populateOptions(container, annotationLayer, annotatorsMap) {
             container.innerHTML = ''; // Clear existing options
@@ -142,7 +144,7 @@ $(function() {
     // Add yolo
     viewer.addTiledImage({
         tileSource: yoloAPI, 
-        opacity: 0.0,  // start with 0, openseadragon won't pull tiles if it's 0
+        opacity: 0.0, // start with 0, openseadragon won't pull tiles if it's 0
         x: 0,
         y: 0,
         width: 1,
@@ -155,7 +157,7 @@ $(function() {
             yoloBtn.value = 'on';
             nucleiImage.setOpacity(1);
             // If dropdown list is open, add row or check it.
-//             annotationLayer.addAnnotator('HDYolo');
+            // annotationLayer.addAnnotator('HDYolo');
         } else {
             yoloBtn.value = 'off';
             nucleiImage.setOpacity(0);
@@ -172,18 +174,18 @@ $(function() {
                 vocabulary: colorPalette.labels(),
             },
             aiChatBox,
+            AnnotatorWidget,
         ],
         'drawingTools': {
             tools: ['rect', 'polygon', 'circle', 'ellipse', 'freehand'],
             container: document.getElementById('manual-toolbar'), 
         },
     });
-    annotationLayer.colorPalette = colorPalette;  // Replace colorPalette with global one
+    annotationLayer.colorPalette = colorPalette; // Replace colorPalette with global one
 
-    // annotationLayer.buildConnections(database_url, imgId);
     annotationLayer.buildConnections(createDB, getAnnotator, getLabels, insert, read, update, deleteanno, search, stream, count);
     annotationLayer.enableEditing(userId);
-    annotationLayer.draw();  // annotationLayer.hide();
+    annotationLayer.draw(); // annotationLayer.hide();
     // viewer.addHandler('viewport-change', annotationLayer.renderActive);
 
     // Add a scale bar

@@ -7,7 +7,7 @@ var AnnotatorWidget = function(args) {
     var annotatorElement = document.createElement('p');
     annotatorElement.textContent = "Last annotated by: " + userIdNameMap[currentAnnotatorValue];
     annotatorElement.className = 'annotator';
-    
+
     var container = document.createElement('div');
     container.className = 'annotator-widget';
     container.classList.add('r6o-draggable');
@@ -16,13 +16,12 @@ var AnnotatorWidget = function(args) {
     return container;
 }
 
-
 var aiChatBox = function(args) {
     // Create container for chatbox
     var chatboxContainer = document.createElement('div');
     chatboxContainer.className = 'chatbox-widget';
     chatboxContainer.style.display = 'none'; // Hide the chatbox initially
-    
+
     // Create button and button container
     var button = document.createElement('button');
     button.className = 'btn btn-sm btn-primary ai-img-caption';
@@ -36,7 +35,7 @@ var aiChatBox = function(args) {
     var container = document.createElement('div');
     container.appendChild(buttonContainer);
     container.appendChild(chatboxContainer);
-    
+
     // Button event listener
     button.addEventListener('click', function () {
         var commentContainer = document.getElementsByClassName("r6o-widget")[0];
