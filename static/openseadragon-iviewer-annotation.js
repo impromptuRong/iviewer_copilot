@@ -102,7 +102,6 @@ class IViewerAnnotation {
         
         // Add Annotorious Layer
         let widgets = this.cfs?.widgets || [];
-        widgets.push(AnnotatorWidget);
         this._annotoriousLayer = OpenSeadragon.Annotorious(viewer, {
             locale: 'auto',
             allowEmpty: true,
@@ -165,19 +164,18 @@ class IViewerAnnotation {
         // }, { passive: true });
     }
 
-    buildConnections(database_url, image_id) {
-        this.database_url = database_url;
+    buildConnections(createDB, getAnnotators, getLabels, insert, read, update, deleteanno, search, stream, count) {
         this.APIs = {
-            annoCreateDBAPI: `${this.database_url}/create?image_id=${image_id}`,
-            annoGetAnnotators: `${this.database_url}/annotators?image_id=${image_id}`,
-            annoGetLabels: `${this.database_url}/labels?image_id=${image_id}`,
-            annoInsertAPI: `${this.database_url}/insert?image_id=${image_id}`,
-            annoReadAPI: `${this.database_url}/read?image_id=${image_id}&item_id=`,
-            annoUpdateAPI: `${this.database_url}/update?image_id=${image_id}&item_id=`,
-            annoDeleteAPI: `${this.database_url}/delete?image_id=${image_id}&item_id=`,
-            annoSearchAPI: `${this.database_url}/search?image_id=${image_id}`,
-            annoStreamAPI: `${this.database_url}/stream?image_id=${image_id}`.replace(/^http:/, 'ws:').replace(/^https:/, 'ws:'),
-            annoCountAnnos: `${this.database_url}/count?image_id=${image_id}`,
+            annoCreateDBAPI: createDB,
+            annoGetAnnotators: getAnnotators,
+            annoGetLabels: getLabels,
+            annoInsertAPI: insert,
+            annoReadAPI: read,
+            annoUpdateAPI: update,
+            annoDeleteAPI: deleteanno,
+            annoSearchAPI: search,
+            annoStreamAPI: stream,
+            annoCountAnnos: count,
         }
         
         //after loading the slide, call api to create its db
@@ -378,10 +376,15 @@ class IViewerAnnotation {
             createAnnotation(api, query).then(ann => {
                 let item = this.createKonvaItem(ann);
                 this.getLayerQueue().add(item);
-                // this.addAnnotator(ann.annotator);
                 this.addAnnotator(this.userId) //display the login user's annotation after creating a new annotation
-                console.log("this active annotator", this.activeAnnotators)
-                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": Array.from(this.activeAnnotators)}, this.colorPalette);
+                //this.activeAnnotators need to filter out model annotator
+                const filteredActiveAnnotators = [];
+                this.activeAnnotators.forEach(item => {
+                    if (!isNaN(item)) {
+                        filteredActiveAnnotators.push(item);
+                    }
+                  });
+                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators}, this.colorPalette);
             });
         });
 
@@ -396,9 +399,15 @@ class IViewerAnnotation {
             updateAnnotation(api, query).then(ann => {
                 item = this.updateKonvaItem(ann, item);
                 item.show();
-                // this.addAnnotator(ann.annotator);
                 this.addAnnotator(this.userId)
-                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": Array.from(this.activeAnnotators)}, this.colorPalette);
+                const filteredActiveAnnotators = [];
+                this.activeAnnotators.forEach(item => {
+                    if (!isNaN(item)) {
+                        filteredActiveAnnotators.push(item);
+                    }
+                  });
+                  console.log()
+                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators}, this.colorPalette);
             });
             this._annotoriousLayer.removeAnnotation(annotation);
             this._annotoriousLayer.clearAnnotations();
@@ -407,13 +416,17 @@ class IViewerAnnotation {
 
         this._annotoriousLayer.on('deleteAnnotation', annotation => {
             let item = this._modifingNode;
-//             console.log("Enter deleteAnnotation: ", item.ann.id, item);
-
             let api = this.APIs.annoDeleteAPI + item.ann.id;
             deleteAnnotation(api).then(resp => {
                 console.log(resp);
                 this.getLayerQueue().remove(item);
-                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": Array.from(this.activeAnnotators)}, this.colorPalette);
+                const filteredActiveAnnotators = [];
+                this.activeAnnotators.forEach(item => {
+                    if (!isNaN(item)) {
+                        filteredActiveAnnotators.push(item);
+                    }
+                  });
+                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators}, this.colorPalette);
             });
             this._annotoriousLayer.cancelSelected();
             this._annotoriousLayer.removeAnnotation(annotation);
