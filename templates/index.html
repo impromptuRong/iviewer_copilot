@@ -47,13 +47,23 @@
         const database_url = `http://${server}:10020/annotation`;
         const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=abc%2F${imgName}&registry=yolov8-lung`;
         const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=abc%2F${imgName}&registry=gpt4o`;
-        
+        const createDB = `http://${server}:10020/annotation/create?image_id=${imgId}`;
+        const getAnnotator = `http://${server}:10020/annotation/annotators?image_id=${imgId}`;
+        const getLabels = `http://${server}:10020/annotation/labels?image_id=${imgId}`;
+        const insert = `http://${server}:10020/annotation/insert?image_id=${imgId}`;
+        const read = `http://${server}:10020/annotation/cread?image_id=${imgId}`;
+        const update = `http://${server}:10020/annotation/update?image_id=${imgId}&item_id=`;
+        const deleteanno = `http://${server}:10020/annotation/delete?image_id=${imgId}&item_id=`;
+        const search = `http://${server}:10020/annotation/search?image_id=${imgId}`;
+        const stream = `ws://${server}:10020/annotation/stream?image_id=${imgId}`;
+        const count = `http://${server}:10020/annotation/count?image_id=${imgId}`;
+      
         // Function to populate options dynamically
         function populateOptions(container, annotationLayer, annotatorsMap) {
             container.innerHTML = ''; // Clear existing options
             let activeIds = annotationLayer.activeAnnotators;
             Object.entries(annotatorsMap).forEach(([key, value]) => {
-                let userId = key || '';
+                let userId = key || ''; 
                 let userName = value || '<anonymous user>';
 
                 let option = document.createElement('option');
@@ -170,7 +180,8 @@ $(function() {
     });
     annotationLayer.colorPalette = colorPalette;  // Replace colorPalette with global one
 
-    annotationLayer.buildConnections(database_url, imgId);
+    // annotationLayer.buildConnections(database_url, imgId);
+    annotationLayer.buildConnections(createDB, getAnnotator, getLabels, insert, read, update, deleteanno, search, stream, count);
     annotationLayer.enableEditing(userId);
     annotationLayer.draw();  // annotationLayer.hide();
     // viewer.addHandler('viewport-change', annotationLayer.renderActive);
