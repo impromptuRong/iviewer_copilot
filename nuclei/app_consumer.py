@@ -26,9 +26,9 @@ DATABASE_DIR = os.environ.get('DATABASE_PATH', './databases/')
 os.makedirs(DATABASE_DIR, exist_ok=True)
 
 # Redis connection
-redis_host = os.environ.get('REDIS_HOST', 'localhost')
-redis_port = os.environ.get('REDIS_PORT', 6379)
-client = redis.Redis(host=redis_host, port=redis_port)
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+REDIS_PORT = os.environ.get('REDIS_PORT', 6379)
+client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT)
 print(f"Redis connection successful: {client.ping()}")
 
 
@@ -41,6 +41,7 @@ def get_sessionmaker(image_id):
 
     return session
 
+
 def test_run(service, image="http://images.cocodataset.org/val2017/000000039769.jpg"):
     print(f"Testing service for {image}")
     st = time.time()
@@ -49,11 +50,13 @@ def test_run(service, image="http://images.cocodataset.org/val2017/000000039769.
 
     print(f"{generated_text} ({time.time()-st}s)")
 
+
 def entry_exists_in_cache(query, session):
     stmt = select(Cache).where(and_(Cache.registry == query['registry'], Cache.tile_id == query['tile_id']))
     result = session.execute(stmt)
 
     return result.one_or_none()
+
 
 def export_to_db(entry):
     image_id, registry, tile_id, output = entry
@@ -95,15 +98,15 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
 
     while time.time() - st < max_halt and global_running:
         if client.exists(config.model_name):
-            # try:
             serialized_entry = client.rpop(config.model_name)
             entry = pickle.loads(serialized_entry)
             # entry = json.loads(serialized_entry)
-            batch_inputs.append((entry['image_id'], entry['registry'], entry['tile_id'], entry['info']['roi_slide']))
+            batch_inputs.append((
+                entry['image_id'], entry['registry'], entry['project'], 
+                entry['tile_id'], entry['info']['roi_slide'],
+            ))
             batch_images.append(entry['img'])   # bytes2numpy(entry['img']) for json
             print(f"Retrieve entry from queue (size={client.llen(config.model_name)}): {len(batch_inputs)}")
-            # except:
-            #     continue
         else:
             time.sleep(0.1)
 
@@ -113,8 +116,8 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
             print(f"Inference batch (size={len(batch_images)}): {time.time() - pst}s.")
 
             pst = time.time()
-            for (image_id, registry, tile_id, patch_info), output in zip(batch_inputs, outputs):
-                output = service.convert_results_to_annotations(output, patch_info, annotator=registry)
+            for (image_id, registry, project, tile_id, patch_info), output in zip(batch_inputs, outputs):
+                output = service.convert_results_to_annotations(output, patch_info, annotator=registry, project=project)
                 status, attempts = -1, 0
                 while status <= 0 and attempts < max_write_attempts:
                     response = export_to_db([image_id, registry, tile_id, output])
@@ -131,8 +134,6 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
 
 
 if __name__ == "__main__":
-    # service = Yolov8SegmentationTorchscript(configs, device='cuda:0')
-    # service = Yolov8SegmentationONNX(config, device='cpu')
     service = MODEL_REGISTRY.get_model(config.model_name)(
         config, device=config.device
     )

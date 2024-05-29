@@ -27,6 +27,8 @@ docker compose up -d
 
 Then you can connect the backend API with frontend server. Or view a demo by opening the `./templates/index.html`
 
+## Extend I-Viewer with customer analysis pipeline
+User can add their own pipeline into I-Viewer with `offline` interface and `online` interface. Basically it takes three steps:
 ```
 ## Create a generator agent
 class GeneratorAgent:
@@ -66,4 +68,3 @@ MODEL_REGISTRY = ModelRegistry()
 MODEL_REGISTRY.register("registry_name", "model", AnalysisAgent)
 MODEL_REGISTRY.register("registry_name", "generator", GeneratorAgent)
 ```
-

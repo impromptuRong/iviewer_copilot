@@ -23,6 +23,7 @@ class Annotation(Base):
     label = Column(String, index=True)
     description = Column(String)
     annotator = Column(String, index=True)
+    # project = Column(String, index=True)
     
     def to_dict(self):
         return {k: self.__dict__[k] for k in self.__table__.columns.keys()}

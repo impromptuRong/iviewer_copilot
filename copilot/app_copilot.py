@@ -135,7 +135,7 @@ def generate_comment(comment, request: gr.Request):
             )
 
             for chunk in stream:
-                print(chunk, end='', flush=True)
+                # print(chunk, end='', flush=True)
                 msg[0][-1] += chunk
                 yield msg
         except:
@@ -250,6 +250,7 @@ with gr.Blocks(css=css) as demo:
             comment_state = gr.State(True)
             comment_toggle_btn = gr.Button(value="Hide comment", elem_classes="button", size='sm', min_width=10)
             regenerate_btn = gr.Button(value="Regenerate", elem_classes="button", size='sm', min_width=10)
+            # mic = gr.Audio(source=["microphone"], type="filepath", streaming=True)
 
         chatbot = gr.Chatbot(
             elem_id="chatbot", label="Copilot", 

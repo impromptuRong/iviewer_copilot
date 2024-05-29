@@ -3,7 +3,6 @@ import re
 import json
 import time
 import asyncio
-# import contextlib
 import redis.asyncio as redis
 from async_lru import alru_cache
 from typing import Dict, List, Optional
@@ -17,8 +16,6 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from utils.db import Base, Annotation
 
-def encode_path(x):
-    return x.replace('/', '%2F').replace(':', '%3A')
 
 app = FastAPI()
 app.add_middleware(
@@ -34,12 +31,17 @@ app.add_middleware(
 DATABASE_DIR = os.environ.get('DATABASE_PATH', './databases/')
 os.makedirs(DATABASE_DIR, exist_ok=True)
 
+
 # Redis connection
-redis_host = os.environ.get('REDIS_HOST', 'localhost')
-redis_port = os.environ.get('REDIS_PORT', 6379)
-pool = redis.ConnectionPool(host=redis_host, port=redis_port, db=0, decode_responses=True)
+REDIS_HOST = os.environ.get('REDIS_HOST', 'localhost')
+REDIS_PORT = os.environ.get('REDIS_PORT', 6379)
+pool = redis.ConnectionPool(host=REDIS_HOST, port=REDIS_PORT, db=0, decode_responses=True)
 async def get_redis():
     return redis.Redis(connection_pool=pool)
+
+
+def encode_path(x):
+    return x.replace('/', '%2F').replace(':', '%3A')
 
 
 def format_labels(text):
@@ -65,7 +67,7 @@ async def get_sessionmaker(image_id):
 
     return async_session
 
-# @contextlib.asynccontextmanager
+
 async def get_session(image_id):
     async_session = await get_sessionmaker(image_id)
     session = async_session()
@@ -97,12 +99,10 @@ async def create_table(image_id: str, client=Depends(get_redis)):
                 msg = f"Create database {db_path}"
             else:
                 msg = f"Database {db_path} exists."
-            print(msg)
             # return JSONResponse(content={"message": msg}, status_code=200)
             return Response(content=msg, status_code=200, media_type="text/plain")
         except Exception as e:
             msg = f"Failed to create database {db_path}"
-            print(msg)
             # raise HTTPException(status_code=400, detail=str(e))
             return Response(content=msg, status_code=500, media_type="text/plain")
         finally:
@@ -124,10 +124,26 @@ async def get_all_annotators(image_id: str, session=Depends(get_session)):
             raise HTTPException(status_code=404, detail="Annotators not found")
 
         annotators = [obj for obj in result.scalars()]
-        # print("************ All annotators", annotators)
+
         return annotators
     except Exception as e:
-        raise HTTPException(status_code=404, detail=str(e))
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+# @app.get("/annotation/projects")
+# async def get_all_projects(image_id: str, session=Depends(get_session)):
+#     try:
+#         print(f"Find all projects from `{image_id}.db/annotation`")
+#         stmt = select(Annotation.project).distinct()
+#         result = await session.execute(stmt)
+#         if not result:
+#             raise HTTPException(status_code=404, detail="Projects not found")
+
+#         projects = [obj for obj in result.scalars()]
+
+#         return projects
+#     except Exception as e:
+#         raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/annotation/labels")
@@ -137,7 +153,7 @@ async def get_all_labels(image_id: str, session=Depends(get_session)):
         stmt = select(Annotation.label).distinct()
         result = await session.execute(stmt)
         if not result:
-            raise HTTPException(status_code=404, detail="Annotators not found")
+            raise HTTPException(status_code=404, detail="Labels not found")
 
         labels = set()
         for obj in result.scalars():
@@ -147,7 +163,6 @@ async def get_all_labels(image_id: str, session=Depends(get_session)):
                         labels.add(item)
         labels = list(labels)
 
-        print("************ All labels", labels)
         return labels
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -161,7 +176,6 @@ async def insert_data(image_id: str, item=Body(...), session=Depends(get_session
 
     if acquired:
         msg = ''
-        # async with async_session() as session:
         try:
             print(f"(Insert) db_lock:{image_id} ({lock}) is locked.")
             obj = {
@@ -176,6 +190,7 @@ async def insert_data(image_id: str, item=Body(...), session=Depends(get_session
                 'label': format_labels(item.get('label', '')),
                 'description': item.get('description', ''),
                 'annotator': item.get('annotator', ''),
+                # 'project': item.get('project', ''),
             }
             if obj['xc'] is None:
                 obj['xc'] = (obj['x0'] + obj['x1']) / 2
@@ -183,7 +198,6 @@ async def insert_data(image_id: str, item=Body(...), session=Depends(get_session
                 obj['yc'] = (obj['y0'] + obj['y1']) / 2
 
             result = await session.execute(insert(Annotation).returning(Annotation), obj)
-            # await session.run_sync(fetch_and_update_objects)
             await session.commit()
             obj = result.scalar().to_dict()
             msg = f"Insert item={obj} to `{image_id}/annotation` successfully. "
@@ -191,7 +205,6 @@ async def insert_data(image_id: str, item=Body(...), session=Depends(get_session
             return obj
         except Exception as e:
             msg = f"Failed to add item={item} to database `{image_id}/annotation`. {e}"
-            print(msg)
             raise HTTPException(status_code=500, detail=msg)
         finally:
             await lock.release()
@@ -209,7 +222,6 @@ async def update_data(image_id: str, item_id: int, item=Body(...), session=Depen
     print(f"(Update) db_lock:{image_id} ({lock}) acquired={acquired}.")
 
     if acquired:
-        # async with async_session() as session:
         try:
             print(f"(Update) db_lock:{image_id} ({lock}) is locked.")
             obj = {
@@ -234,8 +246,7 @@ async def update_data(image_id: str, item_id: int, item=Body(...), session=Depen
                 obj['yc'] = obj.get('yc', (obj['y0'] + obj['y1']) / 2)
             if 'label' in obj:
                 obj['label'] = format_labels(obj['label'])
-            # slots = [{'id': item_id, k: v} for k, v in obj.items()]
-            # result = await session.execute(update(Annotation).returning(Annotation), slots)
+
             stmt = update(Annotation).where(Annotation.id == item_id).values(**obj).returning(Annotation)
             result = await session.execute(stmt)
             await session.commit()
@@ -246,7 +257,6 @@ async def update_data(image_id: str, item_id: int, item=Body(...), session=Depen
             return obj
         except Exception as e:
             msg = f"Failed to update item_id={item_id} with item={item} in `{image_id}/annotation`. {e}"
-            print(msg)
             # raise HTTPException(status_code=400, detail=str(e))
             return Response(content=msg, status_code=500, media_type="text/plain")
         finally:
@@ -264,12 +274,8 @@ async def delete_data(image_id: str, item_id: int, session=Depends(get_session),
     print(f"(Delete) db_lock:{image_id} ({lock}) acquired={acquired}.")
 
     if acquired:
-        # async with async_session() as session:
         try:
             print(f"(Delete) db_lock:{image_id} ({lock}) is locked.")
-            # metadata = MetaData(bind=session.bind)
-            # table = Table(table_name, metadata, autoload=True)
-            # query = table.delete().where(table.c.id == item_id)
             stmt = delete(Annotation).where(Annotation.id == item_id).returning(Annotation)
             result = await session.execute(stmt)
             await session.commit()
@@ -277,7 +283,6 @@ async def delete_data(image_id: str, item_id: int, session=Depends(get_session),
             msg = f"Deleted item_id={obj} in `{image_id}/annotation` successfully. "
             return Response(content=msg, status_code=200, media_type="text/plain")
         except Exception as e:
-            # raise HTTPException(status_code=400, detail=str(e))
             msg = f"Failed to delete item_id={item_id} in `{image_id}/annotation`. {e}"
             # raise HTTPException(status_code=400, detail=str(e))
             return Response(content=msg, status_code=500, media_type="text/plain")
@@ -292,12 +297,7 @@ async def delete_data(image_id: str, item_id: int, session=Depends(get_session),
         
 @app.get("/annotation/read")
 async def read_data(image_id: str, item_id: int, session=Depends(get_session)):
-    # async with async_session() as session:
     try:
-        # metadata = MetaData(bind=session.bind)
-        # table = Table('annotation', metadata, autoload=True)
-        # query = table.select().where(table.c.id == item_id)
-        # result = await session.execute(query).fetchone()
         stmt = select(Annotation).where(Annotation.id == item_id)
         result = await session.execute(stmt)
         result = result.one_or_none()
@@ -310,7 +310,6 @@ async def read_data(image_id: str, item_id: int, session=Depends(get_session)):
 
 @app.post("/annotation/v1/search")
 async def search_data_v1(image_id: str, item=Body(...), session=Depends(get_session)):
-    # async with async_session() as session:
     try:
         stmt = select(Annotation)
 
@@ -388,6 +387,14 @@ async def search_iterator(query, session):
         else:
             if query['annotator']:
                 filters.append(Annotation.annotator.in_(query['annotator']))
+
+    # if 'project' in query:
+    #     if isinstance(query['project'], str):
+    #         filters.append(Annotation.project == query['project'])
+    #     else:
+    #         if query['project']:
+    #             filters.append(Annotation.project.in_(query['project']))
+
     if filters:
         stmt = stmt.where(and_(*filters))
 
@@ -400,13 +407,10 @@ async def search_iterator(query, session):
                 keywords.append(Annotation.description.icontains(keyword))
     if keywords:
         stmt = stmt.filter(or_(*keywords))
+    
     # stmt = select(Annotation).where(and_(*filters)).filter(or_(True, *keywords))
-
-    # print(f"********Inside search_iterator", stmt, session)
-    # try:
     result = await session.stream_scalars(stmt)
     async for scalar in result:
-        # print(f"********yield: {scalar.to_dict()}")
         if 'min_box_area' in query:
             if (scalar.x1 - scalar.x0) * (scalar.y1 - scalar.y0) < query['min_box_area']:
                 continue
@@ -414,37 +418,28 @@ async def search_iterator(query, session):
             if (scalar.x1 - scalar.x0) * (scalar.y1 - scalar.y0) > query['max_box_area']:
                 continue
         yield scalar
-        # async_result = await session.stream(stmt)
-        # result = await session.stream_scalars(stmt)
-        # async for scalar in result:
-        #     print(f"{scalar}")
-    # except:  # asyncio.CancelledError:
-        # await session.rollback()
 
 
 @app.post("/annotation/search")
 async def search_data(image_id: str, item=Body(...), session=Depends(get_session)):
-    # async with async_session() as session:
     db_path = os.path.join(DATABASE_DIR, f'{image_id}.db')
     if not os.path.exists(db_path):
         return []
-    # try:
-    print(f"Search `{image_id}.db/annotation` with query {item}")
-    iterator = search_iterator(item, session=session)
-    results = []
-    async for obj in iterator:
-        results.append(obj.to_dict())
-        # if len(results) >= 100:
-        #     break
-    if not results:
-        raise HTTPException(status_code=404, detail="Item not found")
-    return results
-    # except Exception as e:
-        # raise HTTPException(status_code=400, detail=str(e))
+    try:
+        print(f"Search `{image_id}.db/annotation` with query {item}")
+        iterator = search_iterator(item, session=session)
+        results = []
+        async for obj in iterator:
+            results.append(obj.to_dict())
+        if not results:
+            raise HTTPException(status_code=404, detail="Item not found")
+        return results
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 
 @app.post("/annotation/count")
 async def count_data(image_id: str, item=Body(...), session=Depends(get_session)):
-    # async with async_session() as session:
     db_path = os.path.join(DATABASE_DIR, f'{image_id}.db')
     if not os.path.exists(db_path):
         return 0
@@ -482,7 +477,6 @@ async def search_data_stream(websocket: WebSocket, image_id: str):
         sleep_time = 0.001
         session = async_session()
         try:
-            # async with get_session(image_id) as session:
             iterator = search_iterator(query, session)
             st = time.time()
             async for obj in iterator:
@@ -514,43 +508,11 @@ async def search_data_stream(websocket: WebSocket, image_id: str):
                 st = time.time()
             else:
                 pass
-                # print(f"Ignore query: {query}")
     except WebSocketDisconnect:
         if task and not task.done():
             task.cancel()
 
 
-## A demo with websocket
-connections = {}
-@app.websocket("/ws")
-async def websocket_demo(websocket: WebSocket):
-    await websocket.accept()
-
-    async def tmp_send():
-        x = 'wa'
-        while True:
-            await websocket.send_text(x)
-            x += 'ha'
-            await asyncio.sleep(0.001)  # must!! websocket failed to receive new message if no sleep
-
-    while True:
-        data = await websocket.receive_text()
-        data = json.loads(data)
-        print(f"get text {data}", data == "start", data == "stop", websocket not in connections)
-        if data == "start" and websocket not in connections:
-            print("we create a job")
-            task = asyncio.create_task(tmp_send())
-            connections[websocket] = task
-        elif data == "stop":
-            task = connections.get(websocket)
-            if task:
-                task.cancel()
-                print(f"Cancelled {task}.")
-                del connections[websocket]
-
-
 if __name__ == "__main__":
-    # asyncio.run(test_connection())
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=9025)
-    # gunicorn app_fastapi:app --workers 4 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:9000
+    uvicorn.run(app, host="0.0.0.0", port=9020)

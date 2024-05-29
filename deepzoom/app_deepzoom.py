@@ -78,10 +78,6 @@ DZI_SETTINGS = {
     },
 }
 
-# SERVER_REGISTRY = {
-#     None: DeepZoomGenerator,
-# }
-    
 
 class DeepZoomSettings(BaseModel):
     file: str = None
@@ -91,13 +87,6 @@ class DeepZoomSettings(BaseModel):
     limit_bounds: bool = True
     tile_quality: int = 75
     server: Optional[str] = None
-
-# from cachetools import LRUCache
-# SLIDE_CACHE_SIZE = 8
-# DEEPZOOM_CACHE_SIZE = 16
-# slide_cache = LRUCache(maxsize=SLIDE_CACHE_SIZE)
-# deepzoom_cache = LRUCache(maxsize=DEEPZOOM_CACHE_SIZE)
-# setting_cache = LRUCache(maxsize=DEEPZOOM_CACHE_SIZE)
 
 
 redis_host = os.environ.get('REDIS_HOST', 'localhost')
@@ -111,85 +100,79 @@ setting_cache = Cache(
     timeout=5,           # Set the cache timeout (in seconds)
 )
 
+
 @alru_cache(maxsize=8)
 async def _get_slide(slide_path):
-# try:
-    print(f"Excute remote slide: {slide_path}")
-    slide = SimpleTiff(slide_path)
-    return slide
-# except:
-#     raise HTTPException(status_code=404, detail="Slide not found")
+    try:
+        print(f"Excute remote slide: {slide_path}")
+        slide = SimpleTiff(slide_path)
+        return slide
+    except:
+        raise HTTPException(status_code=404, detail="Slide not found.")
 
 
 @alru_cache(maxsize=16)
 async def _get_generator(key):
-# try:
-    settings = await setting_cache.get(key)  # setting_cache[key]
-    osr = await _get_slide(settings.file)
+    try:
+        settings = await setting_cache.get(key)  # setting_cache[key]
+        osr = await _get_slide(settings.file)
 
-    # slide = osr
-    slide = Slide(osr)
-    slide.attach_reader(osr, engine='simpletiff')
+        slide = Slide(osr)
+        slide.attach_reader(osr, engine='simpletiff')
 
-    # SERVER_REGISTRY[settings.server]
-    generator = DeepZoomGenerator(
-        slide, 
-        tile_size=settings.tile_size,
-        overlap=settings.overlap,
-        limit_bounds=settings.limit_bounds,
-        format=settings.format,
-    )
+        generator = DeepZoomGenerator(
+            slide, 
+            tile_size=settings.tile_size,
+            overlap=settings.overlap,
+            limit_bounds=settings.limit_bounds,
+            format=settings.format,
+        )
 
-    return generator
-# except:
-#     raise HTTPException(status_code=404, detail="DeepZoomGenerator not found")
+        return generator
+    except:
+        raise HTTPException(status_code=404, detail="DeepZoomGenerator not found.")
 
 
 @app.get("/proxy/params")
 async def proxy_params(request: Request):
-# try:
-    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-    image_id = request_args['image_id']
-    registry = request_args.get('registry', 'slide')
-    key = f"{image_id}_{registry}"
+    try:
+        request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+        image_id = request_args['image_id']
+        registry = request_args.get('registry', 'slide')
+        key = f"{image_id}_{registry}"
 
-    generator = await _get_generator(key)
-    w, h = generator.dz_dimensions[-1]
-    info = generator._osr.info
-    print(f"debug params: ({w}, {h}), {info}")
+        generator = await _get_generator(key)
+        w, h = generator.dz_dimensions[-1]
+        info = generator._osr.info
+        print(f"debug params: ({w}, {h}), {info}")
 
-    # osr = await _get_slide(filepath)
-    # slide = Slide(osr)
-    # info = slide.info
-
-    params = {
-        'width': w,
-        'height': h,
-        'slide_mpp': info['mpp'],
-        'magnitude': info['magnitude'],
-        'description': info['description'],
-    }
-    return params
-# except Exception:
-#     raise HTTPException(status_code=404, detail="Slide not found")
+        params = {
+            'width': w,
+            'height': h,
+            'slide_mpp': info['mpp'],
+            'magnitude': info['magnitude'],
+            'description': info['description'],
+        }
+        return params
+    except Exception:
+        raise HTTPException(status_code=404, detail="Slide not found")
 
 
 @app.get("/proxy/thumbnail")
 async def proxy_thumbnail(request: Request):
-# try:
-    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-    image_id = request_args['image_id']
-    registry = request_args.get('registry', 'slide')
-    key = f"{image_id}_{registry}"
-    
-    settings = await setting_cache.get(key)  # setting_cache[key]
-    osr = await _get_slide(settings.file)
+    try:
+        request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+        image_id = request_args['image_id']
+        registry = request_args.get('registry', 'slide')
+        key = f"{image_id}_{registry}"
 
-    slide = Slide(osr)
-    return slide.thumbnail(image_size=512)
+        settings = await setting_cache.get(key)  # setting_cache[key]
+        osr = await _get_slide(settings.file)
+        slide = Slide(osr)
 
-# except Exception:
-#     raise HTTPException(status_code=404, detail="Slide not found")
+        return slide.thumbnail(image_size=512)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Slide not found.")
 
 
 @app.get("/proxy/dummy.dzi")
@@ -237,61 +220,53 @@ async def proxy_dzi(request: Request):
         -------
         the content of .dzi file
     """
-# try:
-    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-    print(f"{request_args}")
-    image_id, registry = request_args['image_id'], request_args['registry']
-    key = f"{image_id}_{registry}"
-    default_args = DZI_SETTINGS.get(registry, DZI_SETTINGS['default'])
+    try:
+        request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+        print(f"{request_args}")
+        image_id, registry = request_args['image_id'], request_args['registry']
+        key = f"{image_id}_{registry}"
+        default_args = DZI_SETTINGS.get(registry, DZI_SETTINGS['default'])
 
-    # cfgs = {k: request_args.get(k, v) for k, v in default_args.items()}  # 
-    cfgs = {**default_args, **request_args}
-    setting = DeepZoomSettings(**cfgs)
+        cfgs = {**default_args, **request_args}
+        setting = DeepZoomSettings(**cfgs)
 
-    await setting_cache.set(key, setting)  # , ttl=600)  # setting_cache[key] = setting
-    print(f"*********************")
-    print(f"proxy_dzi: {key} -> {setting}")
-    print(default_args, request_args, cfgs)
-    print(f"check if {key} is in cache: {await setting_cache.get(key)}")
-    print(f"*********************")
+        await setting_cache.set(key, setting)  # , ttl=600)  # setting_cache[key] = setting
+        print(f"*********************")
+        print(f"proxy_dzi: {key} -> {setting}")
+        print(default_args, request_args, cfgs)
+        print(f"check if {key} is in cache: {await setting_cache.get(key)}")
+        print(f"*********************")
 
-    ## acquire a db, removed to frontend call
-    # database_hostname = "http://localhost:9020"
-    # create_db_url = f"{database_hostname}/annotation/create?image_id={image_id}"
-    # response = requests.post(create_db_url)  # , json={'image_id': image_id})  # replace('/', '%2F').replace(':', '%3A')
-    # print(response.text, response.status_code)  # 200
+        generator = await _get_generator(key)
+        dzi = generator.get_dzi()
 
-    generator = await _get_generator(key)
-    dzi = generator.get_dzi()
-
-    return Response(content=dzi, media_type="application/xml")
-# except Exception:
-#     raise HTTPException(status_code=404, detail="DZI not found")
+        return Response(content=dzi, media_type="application/xml")
+    except Exception:
+        raise HTTPException(status_code=404, detail="DZI not found.")
 
 
 @app.get("/proxy/dummy_files/{level}/{col}_{row}.{format}")
 async def proxy_tile(
     level: int, col: int, row: int, format: str, request: Request,
 ):
-# try:
-    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-    image_id, registry = request_args['image_id'], request_args['registry']
-    key = f"{image_id}_{registry}"
+    try:
+        request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+        image_id, registry = request_args['image_id'], request_args['registry']
+        key = f"{image_id}_{registry}"
 
-    generator = await _get_generator(key)
-    settings = await setting_cache.get(key)
+        generator = await _get_generator(key)
+        settings = await setting_cache.get(key)
 
-    tile = generator.get_tile(level, (col, row), format=format)
-    buf = BytesIO()
-    tile.save(buf, format, quality=settings.tile_quality)
-    resp = Response(content=buf.getvalue(), media_type=f"image/{format}")
+        tile = generator.get_tile(level, (col, row), format=format)
+        buf = BytesIO()
+        tile.save(buf, format, quality=settings.tile_quality)
+        resp = Response(content=buf.getvalue(), media_type=f"image/{format}")
 
-    return resp
-# except ValueError:
-#     raise HTTPException(status_code=404, detail="Invalid level or coordinates")
+        return resp
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Image tile not found.")
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=9010)
-    # gunicorn app_deepzoom:app --workers 8 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:9010

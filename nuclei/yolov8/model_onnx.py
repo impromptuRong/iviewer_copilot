@@ -129,8 +129,7 @@ class Yolov8SegmentationONNX:
 
         return res
     
-    def convert_results_to_annotations(self, output, patch_info, annotator=None):
-        # image_id, registry, tile_id, patch_info, output = r
+    def convert_results_to_annotations(self, output, patch_info, annotator=None, project=None):
         output = map_coords(output, patch_info)
 
         ## save tables
@@ -145,6 +144,7 @@ class Yolov8SegmentationONNX:
         df['description'] = df['label'].astype(str) + '; \nscore=' + df['score'].astype(str)
         df = df.drop(columns=['score'])
         df['annotator'] = annotator or self.configs.model_name
+        # df['project'] = project
         print(f"Export table: {time.time() - st}s.")
 
         return df.to_dict(orient='records')
