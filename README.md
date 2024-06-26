@@ -68,3 +68,9 @@ MODEL_REGISTRY = ModelRegistry()
 MODEL_REGISTRY.register("registry_name", "model", AnalysisAgent)
 MODEL_REGISTRY.register("registry_name", "generator", GeneratorAgent)
 ```
+
+## License
+
+The software package is [licensed](https://github.com/impromptuRong/iviewer_copilot/blob/master/LICENSE). 
+For commercial use, please contact [Ruichen Rong](Ruichen.Rong@UTSouthwestern.edu), [Xiaowei Zhan](mailto:Xiaowei.Zhan@UTSouthwestern.edu) and
+[Guanghua Xiao](mailto:Guanghua.Xiao@UTSouthwestern.edu).
