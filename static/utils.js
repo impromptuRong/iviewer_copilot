@@ -43,6 +43,9 @@ function parseDatabaseAnnotation(ann, colorPalette) {
             label: ann.label,
             description: ann.description,
             annotator: ann.annotator,
+            project_id: ann.project_id,
+            group_id: ann.group_id,
+            created_at: ann.created_at,
             fill: color['face'],
             stroke: color['border'],
             strokeWidth: 2,
@@ -60,6 +63,9 @@ function parseDatabaseAnnotation(ann, colorPalette) {
             label: ann.label,
             description: ann.description,
             annotator: ann.annotator,
+            project_id: ann.project_id,
+            group_id: ann.group_id,
+            created_at: ann.created_at,
             fill: color['face'],
             stroke: color['border'],
             strokeWidth: 2,
@@ -81,6 +87,9 @@ function parseDatabaseAnnotation(ann, colorPalette) {
             label: ann.label,
             description: ann.description,
             annotator: ann.annotator,
+            project_id: ann.project_id,
+            group_id: ann.group_id,
+            created_at: ann.created_at,
             fill: color['face'],
             stroke: color['border'],
             strokeWidth: 2,
@@ -94,7 +103,7 @@ function parseDatabaseAnnotation(ann, colorPalette) {
 
 function konva2w3c(selectedShape) {
     // konva shapes: rect, ellipse, circle, polygon
-    const { id, label, annotator, shape, description} = selectedShape.attrs;
+    const { id, label, annotator, shape, description, created_at} = selectedShape.attrs;
     const bbox = { x0: selectedShape.ann.x0, y0: selectedShape.ann.y0, x1: selectedShape.ann.x1, y1: selectedShape.ann.y1 };
 
     let value, type;
@@ -150,7 +159,7 @@ function konva2w3c(selectedShape) {
                 {
                     "type": "TextualBody",
                     "value": description || '',
-                    "purpose": "commenting"
+                    "purpose": "commenting",
                 },
                 // {
                 //     "type": "TextualBody",
@@ -166,8 +175,13 @@ function konva2w3c(selectedShape) {
                 {
                     "type" : "annotator",
                     "value" : annotator,
-                    "purpose": "showannotator"
-                }
+                    "purpose": "showannotator",
+                },
+                {
+                    "type" : "created_at",
+                    "value" : created_at,
+                    "purpose": "showtime",
+                },
             ],
             "target": {
                 "selector": {

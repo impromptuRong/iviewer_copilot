@@ -163,6 +163,7 @@ div#view.fullpage {
     text-align: left;
     margin-right: 5px;
     display: inline;
+    white-space: pre;
 }
 
 .chatbox-widget {

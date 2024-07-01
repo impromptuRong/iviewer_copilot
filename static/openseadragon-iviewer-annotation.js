@@ -367,6 +367,8 @@ class IViewerAnnotation {
 //             let query = w3c2konva(annotation, this.userId);  // JSON.stringify(annotation)
             let query = w3c2konva(annotation);  // JSON.stringify(annotation)
             query['annotator'] = this.userId.toString();
+            query['created_at'] = new Date().toISOString();
+            console.log(query['created_at']);
 //             console.log("Enter createAnnotation", query);
             this._annotoriousLayer.removeAnnotation(annotation);
             this._annotoriousLayer.cancelSelected();
@@ -376,8 +378,8 @@ class IViewerAnnotation {
             createAnnotation(api, query).then(ann => {
                 let item = this.createKonvaItem(ann);
                 this.getLayerQueue().add(item);
-                this.addAnnotator(this.userId) //display the login user's annotation after creating a new annotation
-                //this.activeAnnotators need to filter out model annotator
+                this.addAnnotator(this.userId);  // display the login user's annotation after creating a new annotation
+                // this.activeAnnotators need to filter out model annotator
                 const filteredActiveAnnotators = [];
                 this.activeAnnotators.forEach(item => {
                     if (!isNaN(item)) {
@@ -393,13 +395,14 @@ class IViewerAnnotation {
 //             let query = w3c2konva(annotation, this.userId);
             let query = w3c2konva(annotation);
             query['annotator'] = this.userId.toString();
+            query['created_at'] = new Date().toISOString();
 //             console.log("Enter updateAnnotation", item.ann.id, item, query);
 
             let api = this.APIs.annoUpdateAPI + item.ann.id;
             updateAnnotation(api, query).then(ann => {
                 item = this.updateKonvaItem(ann, item);
                 item.show();
-                this.addAnnotator(this.userId)
+                this.addAnnotator(this.userId);
                 const filteredActiveAnnotators = [];
                 this.activeAnnotators.forEach(item => {
                     if (!isNaN(item)) {

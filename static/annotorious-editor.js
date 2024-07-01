@@ -4,8 +4,19 @@ var AnnotatorWidget = function(args) {
     }) : null;
     var currentAnnotatorValue = currentAnnotator ? currentAnnotator.value : userId;
 
+    var currentCreateAt = args.annotation ? args.annotation.bodies.find(function(b) {
+        return b.purpose == 'showtime';
+    }) : null;
+    var currentCreateTimeISO = currentCreateAt ? currentCreateAt.value : null;
+
     var annotatorElement = document.createElement('p');
     annotatorElement.textContent = "Last annotated by: " + userIdNameMap[currentAnnotatorValue];
+    if (currentCreateTimeISO != null) {
+        // Convert local time
+        const isoTime = new Date(currentCreateTimeISO);
+        const localTime = new Date( isoTime.getTime() - isoTime.getTimezoneOffset() * 60000);
+        annotatorElement.textContent += '\n' + localTime.toLocaleString();
+    }
     annotatorElement.className = 'annotator';
 
     var container = document.createElement('div');
