@@ -113,4 +113,4 @@ services:
       - OLLAMA_PORT_CAPTION=${OLLAMA_PORT_CAPTION}
       - OLLAMA_PORT_CHATBOT=${OLLAMA_PORT_CHATBOT}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - NO_PROXY=localhost,127.0.0.1,annotation,${OLLAMA_HOST}
+      - NO_PROXY=localhost,127.0.0.1,annotation,${OLLAMA_HOST},api.openai.com

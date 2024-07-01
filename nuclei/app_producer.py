@@ -173,7 +173,8 @@ async def proxy_tile(
     try:
         request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
         image_id, registry = request_args['image_id'], request_args['registry']
-        project = request_args.get('project', '')
+        project_id = request_args.get('project_id', '')
+        group_id = request_args.get('group_id', '')
         # image_id = image_id.replace('/', '%2F').replace(':', '%3A')
         key = f"{image_id}_{registry}"
 
@@ -211,8 +212,12 @@ async def proxy_tile(
             patch = generator._osr.get_patch(info['coord'], generator.page)
             patch = pad_pil(patch.convert('RGB'), info['pad_width'], color=0)  # pad_l, pad_r, pad_u, pad_d
             # serialized_item = json.dumps({'image_id': image_id, 'registry': registry, 'info': info, 'img': pil2bytes(patch, format='jpeg')})
-            serialized_item = pickle.dumps({'image_id': image_id, 'registry': registry, 'project': project,
-                                            'tile_id': tile_id, 'info': info, 'img': patch})
+            extra = {'project_id': project_id, 'group_id': group_id}
+            serialized_item = pickle.dumps({
+                'image_id': image_id, 'registry': registry, 
+                'tile_id': tile_id, 'info': info, 'img': patch, 
+                'extra': extra,
+            })
             # TODO: switch to redis stream
             tag = await client.lpush(registry, serialized_item)
             if not tag:

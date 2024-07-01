@@ -1,11 +1,13 @@
-from sqlalchemy import Column, Float, String, Integer, Table, MetaData
-# from sqlalchemy.orm import DeclarativeBase
-from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Float, String, Integer, Table, DateTime
+from sqlalchemy.orm import DeclarativeBase
+# from sqlalchemy.ext.declarative import declarative_base
+from datetime import datetime
 
 
-# class Base(DeclarativeBase):
-#     pass
-Base = declarative_base()
+class Base(DeclarativeBase):
+    def to_dict(self):
+        return {k: self.__dict__[k] for k in self.__table__.columns.keys()}
+# Base = declarative_base()
 
 
 class Annotation(Base):
@@ -23,10 +25,15 @@ class Annotation(Base):
     label = Column(String, index=True)
     description = Column(String)
     annotator = Column(String, index=True)
-    # project = Column(String, index=True)
-    
+    project_id = Column(String, index=True)
+    group_id = Column(String, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
     def to_dict(self):
-        return {k: self.__dict__[k] for k in self.__table__.columns.keys()}
+        item = super().to_dict()
+        item['created_at'] = item['created_at'].isoformat() if item['created_at'] else None
+
+        return item
 
 
 class Cache(Base):
@@ -36,6 +43,3 @@ class Cache(Base):
     registry = Column(String, index=True)
     tile_id = Column(String)
     # status = Column(String)
-
-    def to_dict(self):
-        return {k: self.__dict__[k] for k in self.__table__.columns.keys()}

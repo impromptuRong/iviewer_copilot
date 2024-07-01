@@ -4,6 +4,7 @@ import json
 import time
 import asyncio
 import redis.asyncio as redis
+from datetime import datetime
 from async_lru import alru_cache
 from typing import Dict, List, Optional
 
@@ -130,20 +131,36 @@ async def get_all_annotators(image_id: str, session=Depends(get_session)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-# @app.get("/annotation/projects")
-# async def get_all_projects(image_id: str, session=Depends(get_session)):
-#     try:
-#         print(f"Find all projects from `{image_id}.db/annotation`")
-#         stmt = select(Annotation.project).distinct()
-#         result = await session.execute(stmt)
-#         if not result:
-#             raise HTTPException(status_code=404, detail="Projects not found")
+@app.get("/annotation/groups")
+async def get_all_groups(image_id: str, session=Depends(get_session)):
+    try:
+        print(f"Find all groups from `{image_id}.db/annotation`")
+        stmt = select(Annotation.group_id).distinct()
+        result = await session.execute(stmt)
+        if not result:
+            raise HTTPException(status_code=404, detail="Groups not found")
 
-#         projects = [obj for obj in result.scalars()]
+        groups = [obj for obj in result.scalars()]
 
-#         return projects
-#     except Exception as e:
-#         raise HTTPException(status_code=400, detail=str(e))
+        return groups
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+
+@app.get("/annotation/projects")
+async def get_all_projects(image_id: str, session=Depends(get_session)):
+    try:
+        print(f"Find all projects from `{image_id}.db/annotation`")
+        stmt = select(Annotation.project_id).distinct()
+        result = await session.execute(stmt)
+        if not result:
+            raise HTTPException(status_code=404, detail="Projects not found")
+
+        projects = [obj for obj in result.scalars()]
+
+        return projects
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @app.get("/annotation/labels")
@@ -190,12 +207,24 @@ async def insert_data(image_id: str, item=Body(...), session=Depends(get_session
                 'label': format_labels(item.get('label', '')),
                 'description': item.get('description', ''),
                 'annotator': item.get('annotator', ''),
-                # 'project': item.get('project', ''),
+                'project_id': item.get('project_id', ''),
+                'group_id': item.get('group_id', ''),
             }
+
+            # Calculate xc and yc if not given
             if obj['xc'] is None:
                 obj['xc'] = (obj['x0'] + obj['x1']) / 2
             if obj['yc'] is None:
                 obj['yc'] = (obj['y0'] + obj['y1']) / 2
+
+            # Parse the datetime string
+            try:
+                created_at = item['created_at'].replace('Z', '+00:00')
+                created_at = datetime.fromisoformat(created_at)
+            except:
+                created_at = None
+            if created_at:
+                obj['created_at'] = created_at
 
             result = await session.execute(insert(Annotation).returning(Annotation), obj)
             await session.commit()
@@ -247,6 +276,18 @@ async def update_data(image_id: str, item_id: int, item=Body(...), session=Depen
             if 'label' in obj:
                 obj['label'] = format_labels(obj['label'])
 
+            # Parse the datetime string
+            if obj['created_at']:
+                try:
+                    created_at = obj['created_at'].replace('Z', '+00:00')
+                    created_at = datetime.fromisoformat(created_at)
+                except:
+                    created_at = None
+                if created_at:
+                    obj['created_at'] = created_at
+                else:
+                    del obj['created_at']
+
             stmt = update(Annotation).where(Annotation.id == item_id).values(**obj).returning(Annotation)
             result = await session.execute(stmt)
             await session.commit()
@@ -292,7 +333,6 @@ async def delete_data(image_id: str, item_id: int, session=Depends(get_session),
     else:
         msg = f"Failed to acquire `db_lock:{image_id}`. Processed by another process/thread."
         return Response(content=msg, status_code=409, media_type="text/plain")
-
 
         
 @app.get("/annotation/read")
@@ -375,6 +415,21 @@ async def search_iterator(query, session):
     # if 'max_box_area' in query:
     #     filters.append((Annotation.x1 - Annotation.x0) * (Annotation.y1 - Annotation.y0) <= float(query['max_box_area']))
 
+    if 'start_time' in query:
+        try:
+            start_time = datetime.fromisoformat(query['start_time'].replace('Z', '+00:00'))
+        except:
+            start_time = None
+        if start_time:
+            filters.append(Annotation.created_at >= start_time)
+    if 'end_time' in query:
+        try:
+            end_time = datetime.fromisoformat(query['end_time'].replace('Z', '+00:00'))
+        except:
+            end_time = None
+        if end_time:
+            filters.append(Annotation.created_at < end_time)
+    
     if 'label' in query:
         if isinstance(query['label'], str):
             filters.append(Annotation.label == query['label'])
@@ -388,12 +443,19 @@ async def search_iterator(query, session):
             if query['annotator']:
                 filters.append(Annotation.annotator.in_(query['annotator']))
 
-    # if 'project' in query:
-    #     if isinstance(query['project'], str):
-    #         filters.append(Annotation.project == query['project'])
-    #     else:
-    #         if query['project']:
-    #             filters.append(Annotation.project.in_(query['project']))
+    if 'project_id' in query:
+        if isinstance(query['project_id'], str):
+            filters.append(Annotation.project_id == query['project_id'])
+        else:
+            if query['project_id']:
+                filters.append(Annotation.project_id.in_(query['project_id']))
+
+    if 'group_id' in query:
+        if isinstance(query['group_id'], str):
+            filters.append(Annotation.group_id == query['group_id'])
+        else:
+            if query['group_id']:
+                filters.append(Annotation.group_id.in_(query['group_id']))
 
     if filters:
         stmt = stmt.where(and_(*filters))
@@ -407,7 +469,7 @@ async def search_iterator(query, session):
                 keywords.append(Annotation.description.icontains(keyword))
     if keywords:
         stmt = stmt.filter(or_(*keywords))
-    
+
     # stmt = select(Annotation).where(and_(*filters)).filter(or_(True, *keywords))
     result = await session.stream_scalars(stmt)
     async for scalar in result:

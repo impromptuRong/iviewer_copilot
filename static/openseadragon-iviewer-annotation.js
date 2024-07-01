@@ -215,7 +215,7 @@ class IViewerAnnotation {
             sendMessageWithRetry(this.webSocket, query);
             this.webSocket.onmessage = (event) => {
                 let ann = JSON.parse(event.data);
-                // console.log("return annotation", ann)
+                console.log("return annotation", ann)
                 let item = this.createKonvaItem(ann);
                 layerQueue.add(item);
             }

@@ -102,8 +102,9 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
             entry = pickle.loads(serialized_entry)
             # entry = json.loads(serialized_entry)
             batch_inputs.append((
-                entry['image_id'], entry['registry'], entry['project'], 
+                entry['image_id'], entry['registry'], 
                 entry['tile_id'], entry['info']['roi_slide'],
+                entry['extra'], 
             ))
             batch_images.append(entry['img'])   # bytes2numpy(entry['img']) for json
             print(f"Retrieve entry from queue (size={client.llen(config.model_name)}): {len(batch_inputs)}")
@@ -116,8 +117,10 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
             print(f"Inference batch (size={len(batch_images)}): {time.time() - pst}s.")
 
             pst = time.time()
-            for (image_id, registry, project, tile_id, patch_info), output in zip(batch_inputs, outputs):
-                output = service.convert_results_to_annotations(output, patch_info, annotator=registry, project=project)
+            for (image_id, registry, tile_id, patch_info, extra), output in zip(batch_inputs, outputs):
+                output = service.convert_results_to_annotations(
+                    output, patch_info, annotator=registry, extra=extra,
+                )
                 status, attempts = -1, 0
                 while status <= 0 and attempts < max_write_attempts:
                     response = export_to_db([image_id, registry, tile_id, output])

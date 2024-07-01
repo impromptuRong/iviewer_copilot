@@ -8,8 +8,27 @@ I-viewer copilot is a comprehensive online framework designed to address the nee
 git clone https://github.com/impromptuRong/iviewer_copilot.git
 cd iviewer_copilot
 ```
+2. Install ollama from https://ollama.com/download, and start ollama server
 
-2. Create an `.env` file with the following contents to specify MLLM service.
+For Image Captioning:
+```
+export OLLAMA_HOST="0.0.0.0:11434"
+export OLLAMA_ORIGINS="*"
+
+ollama pull llava
+ollama serve
+```
+
+For LLM Copilot:
+```
+export OLLAMA_HOST="0.0.0.0:11435"
+export OLLAMA_ORIGINS="*"
+
+ollama pull llama3
+ollama serve
+```
+
+3. Create an `.env` file with the following contents to specify MLLM service.
 ```
 SLIDES_DIR=input_slides_folder
 DATABASE_DIR=./databases
@@ -20,7 +39,7 @@ OPENAI_API_KEY=openai_api_key
 ```
 I-Viewer rely on `ollama` or `openai API` to enable chatbot and captioning service. For GPT user, put openai_api_key into the `.env` file as above. For `ollama` user, we recommend to host ollama service on a separate server. (Instructions about how to set up ollama and LLM models can be found here: https://github.com/ollama/ollama)
 
-3. Start server with docker
+4. Start server with docker
 ```
 docker compose up -d
 ```
