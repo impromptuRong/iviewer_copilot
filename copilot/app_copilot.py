@@ -99,8 +99,8 @@ def onload(request: gr.Request):
     patch = get_roi_tile(request, image_size)
     # patch = go.Figure(go.Image(z=np.array(patch)))
 
-    msg = [[None, request_args.get('description')]]
-    return patch, msg
+    msg = request_args.get('description')
+    return patch, [[None, msg]], msg or ''
 
 
 def generate_comment(comment, request: gr.Request):
@@ -112,10 +112,10 @@ def generate_comment(comment, request: gr.Request):
     ## Init a message based on comment
     msg = comment or [[None, '']]
     if msg[0][-1]:
-        yield msg
+        yield msg, msg[0][-1]
     elif x1 - x0 < 100 or y1 - y0 < 100:
         # get region size, if it's too small, we don't auto generate messages
-        yield msg
+        yield msg, msg[0][-1]
     else:
         ## Run MLLM agents for image caption
         try:
@@ -137,10 +137,10 @@ def generate_comment(comment, request: gr.Request):
             for chunk in stream:
                 # print(chunk, end='', flush=True)
                 msg[0][-1] += chunk
-                yield msg
+                yield msg, msg[0][-1]
         except:
             msg[0][-1] += f"Failed to generate image captions with MLLM agents."
-            yield msg
+            yield msg, msg[0][-1]
 
         ## Run nuclei summary agents
         try:
@@ -148,12 +148,12 @@ def generate_comment(comment, request: gr.Request):
             if stats:
                 nuclei_summary = json.dumps(stats)
                 msg[0][-1] += f"\n\nAdditionally, the following information are observed: "
-                yield msg
+                yield msg, msg[0][-1]
                 msg[0][-1] += f"{nuclei_summary}."
-                yield msg
+                yield msg, msg[0][-1]
         except:
             msg[0][-1] += f"Failed to generate nuclei summary with agents."
-            yield msg
+            yield msg, msg[0][-1]
 
 
 def user(user_message, history):
@@ -219,7 +219,7 @@ def vote(data: gr.LikeData):
 css = """
 #copilot { height: 80vh; }
 #image { flex-grow: 1; overflow: auto; }
-#comment { flex-grow: 1; overflow: auto; }
+#comment { flex-grow: 1; overflow: auto; height: 32vh; }
 #chatbot { flex-grow: 1; overflow: auto; }
 footer {visibility: hidden}
 """
@@ -235,14 +235,26 @@ with gr.Blocks(css=css) as demo:
                 height='32vh',
                 show_download_button=True,
             )
-            comment = gr.Chatbot(
-                elem_id="comment", 
-                visible=True, 
-                height='32vh',
-                label="Comment", 
-                layout="panel", 
-                show_copy_button=True,
-            )
+            with gr.Tabs(elem_id='comment') as comment_tab:
+                with gr.TabItem("comment"):
+                    comment = gr.Chatbot(
+                        elem_id="display", 
+                        visible=True, 
+                        height='32vh',
+                        # label="Comment", 
+                        show_label=False,
+                        layout="panel", 
+                        show_copy_button=True,
+                    )
+                with gr.TabItem("editor"):
+                    editor = gr.Textbox(
+                        elem_id="editor", 
+                        visible=True, 
+                        show_label=False,
+                        show_copy_button=True,
+                        lines=5,
+                        max_lines=100,
+                    )
 
         with gr.Row():
             image_state = gr.State(False)
@@ -270,16 +282,20 @@ with gr.Blocks(css=css) as demo:
             clear_btn = gr.Button("Clear", elem_classes="button", size='sm', min_width=10)
 
     # Onload run generate_comment
-    comment_fn = demo.load(onload, inputs=None, outputs=[image, comment]).then(
-        generate_comment, inputs=[comment], outputs=[comment],
+    comment_fn = demo.load(onload, inputs=None, outputs=[image, comment, editor]).success(
+        generate_comment, inputs=[comment], outputs=[comment, editor],
     )  #, _js=on_load)
 
     # Click regenerate button: stop onload run, clear comment content, regenerate comment
+    def clear_comment():
+        return None, ''
     comment_regnerate_fn = regenerate_btn.click(
-        clear_fn, inputs=None, outputs=[comment], cancels=[comment_fn],
-    ).then(
-        generate_comment, inputs=[comment], outputs=[comment],
+        lambda: (None, ''), inputs=None, outputs=[comment, editor], cancels=[comment_fn], queue=False,
+    ).success(
+        generate_comment, inputs=[comment], outputs=[comment, editor],
     )
+    # sync markdown with editor when user edit the content
+    editor.input(lambda x: [[None, x]] if x else None, inputs=[editor], outputs=[comment])
 
     # Click Enter after chat: ignore inputs if current chat is still running
     chat_submit_fn = prompt.submit(user, [prompt, chatbot], [prompt, chatbot]).then(
@@ -293,14 +309,14 @@ with gr.Blocks(css=css) as demo:
     )
 
     # Click Stop button: stop ongoging generation and chat
-    stop_btn.click(None, None, None, cancels=[comment_fn, comment_regnerate_fn, chat_submit_fn, chat_go_fn])
+    stop_btn.click(None, None, None, cancels=[comment_fn, comment_regnerate_fn, chat_submit_fn, chat_go_fn], queue=False)
 
     # Click Clear button: stop ongoing chat, clear chatbot content
-    clear_btn.click(clear_fn, None, [chatbot], cancels=[chat_submit_fn, chat_go_fn])
+    clear_btn.click(clear_fn, None, [chatbot], cancels=[chat_submit_fn, chat_go_fn], queue=False)
 
     # Click Hide/Show Image/Comment button: hide/show comment content
     image_toggle_btn.click(toggle_image, [image_state], [image, image_state, image_toggle_btn])
-    comment_toggle_btn.click(toggle_comment, [comment_state], [comment, comment_state, comment_toggle_btn])
+    comment_toggle_btn.click(toggle_comment, [comment_state], [comment_tab, comment_state, comment_toggle_btn])
 
     chatbot.like(vote, None, None)
 
