@@ -2,11 +2,9 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY utils ./utils
 COPY annotation/. .
+COPY utils ./utils
+RUN pip install --no-cache-dir -r requirements.txt
 
 RUN export no_proxy="localhost"
 

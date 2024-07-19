@@ -1,0 +1,14 @@
+aiocache
+aiosqlite
+asyncio
+async_lru
+fastapi
+gunicorn
+imagecodecs
+matplotlib
+opencv-python-headless
+pandas
+redis
+requests
+sqlalchemy
+scikit-image

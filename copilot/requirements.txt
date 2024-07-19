@@ -7,7 +7,6 @@ gradio
 gunicorn
 imagecodecs
 ollama
-onnxruntime
 openai
 opencv-python-headless
 redis
