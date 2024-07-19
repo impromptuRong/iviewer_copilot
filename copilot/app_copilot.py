@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import gradio as gr
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from functools import lru_cache
 
@@ -72,26 +72,18 @@ def get_roi_tile(request: gr.Request, image_size=(512, 512)):
     return patch
 
 
-def get_nuclei_stats(request: gr.Request):
-    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-    image_id, registry = request_args['image_id'], request_args['registry']
-
-    request_url = f"{database_hostname}/annotation/search?image_id={image_id}"
-    criteria = {**request_args, 'annotator': ['yolov8-lung']}  # 'label': ['tumor', 'immune']}
+def get_roi_annotations(request_url, criteria={}):
     response = requests.post(request_url, json=criteria)
     if response.status_code == 200:
         resp = json.loads(response.content.decode('utf-8'))
-        df = pd.DataFrame(resp)
-        if not df.empty:
-            return df['label'].value_counts().to_dict()
-        else:
-            return {}
+        return resp
     else:
         return {}
 
 
-def onload(request: gr.Request):
+def onload(db_state, request: gr.Request):
     request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+    image_id, registry = request_args['image_id'], request_args['registry']
 
     client = MODEL_REGISTRY.get_caption_model(request_args['registry'])
     print(f"Using client {request_args['registry']} (model={client.model})")
@@ -99,11 +91,15 @@ def onload(request: gr.Request):
     patch = get_roi_tile(request, image_size)
     # patch = go.Figure(go.Image(z=np.array(patch)))
 
+    request_url = f"{database_hostname}/annotation/search?image_id={image_id}"
+    criteria = {**request_args,}  # 'annotator': ['yolov8-lung']} 'label': ['tumor', 'immune']}
+    res = get_roi_annotations(request_url, criteria=criteria)
+
     msg = request_args.get('description')
-    return patch, [[None, msg]], msg or ''
+    return patch, [[None, msg]], msg or '', res
 
 
-def generate_comment(comment, request: gr.Request):
+def generate_comment(comment, db_state, request: gr.Request):
     request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
     
     x0, y0 = float(request_args['x0']), float(request_args['y0'])
@@ -144,8 +140,9 @@ def generate_comment(comment, request: gr.Request):
 
         ## Run nuclei summary agents
         try:
-            stats = get_nuclei_stats(request)
-            if stats:
+            df = pd.DataFrame(db_state)
+            if not df.empty:
+                stats = df['label'].value_counts().to_dict()
                 nuclei_summary = json.dumps(stats)
                 msg[0][-1] += f"\n\nAdditionally, the following information are observed: "
                 yield msg, msg[0][-1]
@@ -163,7 +160,7 @@ def user(user_message, history):
     return "", history
 
 
-def llm_copilot(comment, history, request: gr.Request):
+def llm_copilot(comment, db_state, history, request: gr.Request):
     if history and history[-1][-1] is None:
         ## Construct messages
         request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
@@ -228,6 +225,7 @@ footer {visibility: hidden}
 
 with gr.Blocks(css=css) as demo:
     with gr.Column(elem_id="copilot"):
+        db_state = gr.State()
         with gr.Row():
             image = gr.ImageEditor(
                 elem_id="image", 
@@ -282,8 +280,8 @@ with gr.Blocks(css=css) as demo:
             clear_btn = gr.Button("Clear", elem_classes="button", size='sm', min_width=10)
 
     # Onload run generate_comment
-    comment_fn = demo.load(onload, inputs=None, outputs=[image, comment, editor]).success(
-        generate_comment, inputs=[comment], outputs=[comment, editor],
+    comment_fn = demo.load(onload, inputs=[db_state], outputs=[image, comment, editor, db_state]).success(
+        generate_comment, inputs=[comment, db_state], outputs=[comment, editor],
     )  #, _js=on_load)
 
     # Click regenerate button: stop onload run, clear comment content, regenerate comment
@@ -292,20 +290,20 @@ with gr.Blocks(css=css) as demo:
     comment_regnerate_fn = regenerate_btn.click(
         lambda: (None, ''), inputs=None, outputs=[comment, editor], cancels=[comment_fn], queue=False,
     ).success(
-        generate_comment, inputs=[comment], outputs=[comment, editor],
+        generate_comment, inputs=[comment, db_state], outputs=[comment, editor],
     )
     # sync markdown with editor when user edit the content
     editor.input(lambda x: [[None, x]] if x else None, inputs=[editor], outputs=[comment])
 
     # Click Enter after chat: ignore inputs if current chat is still running
     chat_submit_fn = prompt.submit(user, [prompt, chatbot], [prompt, chatbot]).then(
-        llm_copilot, [comment, chatbot], chatbot
+        llm_copilot, inputs=[comment, db_state, chatbot], outputs=chatbot,
     )
     # chat = prompt.submit(llm_copilot, [prompt, comment, chatbot], [prompt, chatbot])
 
     # Click Chat button: ignore inputs if current chat is still running
     chat_go_fn = go_btn.click(user, [prompt, chatbot], [prompt, chatbot]).then(
-        llm_copilot, [comment, chatbot], chatbot
+        llm_copilot, inputs=[comment, db_state, chatbot], outputs=chatbot,
     )
 
     # Click Stop button: stop ongoging generation and chat
