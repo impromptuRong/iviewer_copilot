@@ -107,8 +107,8 @@ async def _get_slide(slide_path):
         print(f"Excute remote slide: {slide_path}")
         slide = SimpleTiff(slide_path)
         return slide
-    except:
-        raise HTTPException(status_code=404, detail="Slide not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to load slide from {slide_path}: {str(e)}")
 
 
 @alru_cache(maxsize=16)
@@ -129,8 +129,8 @@ async def _get_generator(key):
         )
 
         return generator
-    except:
-        raise HTTPException(status_code=404, detail="DeepZoomGenerator not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get DeepZoomGenerator for {key}: {str(e)}")
 
 
 @app.get("/proxy/params")
@@ -144,7 +144,7 @@ async def proxy_params(request: Request):
         generator = await _get_generator(key)
         w, h = generator.dz_dimensions[-1]
         info = generator._osr.info
-        print(f"debug params: ({w}, {h}), {info}")
+        # print(f"debug params: ({w}, {h}), {info}")
 
         params = {
             'width': w,
@@ -154,8 +154,8 @@ async def proxy_params(request: Request):
             'description': info['description'],
         }
         return params
-    except Exception:
-        raise HTTPException(status_code=404, detail="Slide not found")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get slide parameters for {key}: {str(e)}")
 
 
 @app.get("/proxy/thumbnail")
@@ -171,8 +171,8 @@ async def proxy_thumbnail(request: Request):
         slide = Slide(osr)
 
         return slide.thumbnail(image_size=512)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Slide not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get slide thumbnail for {key}: {str(e)}")
 
 
 @app.get("/proxy/dummy.dzi")
@@ -241,8 +241,8 @@ async def proxy_dzi(request: Request):
         dzi = generator.get_dzi()
 
         return Response(content=dzi, media_type="application/xml")
-    except Exception:
-        raise HTTPException(status_code=404, detail="DZI not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get dzi for {key}: {str(e)}")
 
 
 @app.get("/proxy/dummy_files/{level}/{col}_{row}.{format}")
@@ -263,8 +263,8 @@ async def proxy_tile(
         resp = Response(content=buf.getvalue(), media_type=f"image/{format}")
 
         return resp
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Image tile not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get image tile for {key}: {str(e)}")
 
 
 if __name__ == "__main__":

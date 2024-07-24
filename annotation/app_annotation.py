@@ -103,7 +103,7 @@ async def create_table(image_id: str, client=Depends(get_redis)):
             # return JSONResponse(content={"message": msg}, status_code=200)
             return Response(content=msg, status_code=200, media_type="text/plain")
         except Exception as e:
-            msg = f"Failed to create database {db_path}"
+            msg = f"Failed to create database {db_path}: {str(e)}"
             # raise HTTPException(status_code=400, detail=str(e))
             return Response(content=msg, status_code=500, media_type="text/plain")
         finally:
@@ -122,13 +122,13 @@ async def get_all_annotators(image_id: str, session=Depends(get_session)):
         stmt = select(Annotation.annotator).distinct()
         result = await session.execute(stmt)
         if not result:
-            raise HTTPException(status_code=404, detail="Annotators not found")
+            raise HTTPException(status_code=404, detail="Annotators not found. ")
 
         annotators = [obj for obj in result.scalars()]
 
         return annotators
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to get all annotators: {str(e)}")
 
 
 @app.get("/annotation/groups")
@@ -138,7 +138,7 @@ async def get_all_groups(image_id: str, session=Depends(get_session)):
         stmt = select(Annotation.group_id).distinct()
         result = await session.execute(stmt)
         if not result:
-            raise HTTPException(status_code=404, detail="Groups not found")
+            raise HTTPException(status_code=404, detail=str(e))
 
         groups = [obj for obj in result.scalars()]
 
@@ -154,13 +154,13 @@ async def get_all_projects(image_id: str, session=Depends(get_session)):
         stmt = select(Annotation.project_id).distinct()
         result = await session.execute(stmt)
         if not result:
-            raise HTTPException(status_code=404, detail="Projects not found")
+            raise HTTPException(status_code=404, detail="Projects not found. ")
 
         projects = [obj for obj in result.scalars()]
 
         return projects
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to get all projects: {str(e)}")
 
 
 @app.get("/annotation/labels")
@@ -170,7 +170,7 @@ async def get_all_labels(image_id: str, session=Depends(get_session)):
         stmt = select(Annotation.label).distinct()
         result = await session.execute(stmt)
         if not result:
-            raise HTTPException(status_code=404, detail="Labels not found")
+            raise HTTPException(status_code=404, detail="Labels not found. ")
 
         labels = set()
         for obj in result.scalars():
@@ -182,7 +182,7 @@ async def get_all_labels(image_id: str, session=Depends(get_session)):
 
         return labels
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to get all labels: {str(e)}")
 
 
 @app.post("/annotation/insert")
@@ -233,7 +233,7 @@ async def insert_data(image_id: str, item=Body(...), session=Depends(get_session
             print(msg)
             return obj
         except Exception as e:
-            msg = f"Failed to add item={item} to database `{image_id}/annotation`. {e}"
+            msg = f"Failed to add item={item} to database `{image_id}/annotation`. {str(e)}"
             raise HTTPException(status_code=500, detail=msg)
         finally:
             await lock.release()
@@ -297,7 +297,7 @@ async def update_data(image_id: str, item_id: int, item=Body(...), session=Depen
             # return Response(content=msg, status_code=200, media_type="text/plain")
             return obj
         except Exception as e:
-            msg = f"Failed to update item_id={item_id} with item={item} in `{image_id}/annotation`. {e}"
+            msg = f"Failed to update item_id={item_id} with item={item} in `{image_id}/annotation`. {str(e)}"
             # raise HTTPException(status_code=400, detail=str(e))
             return Response(content=msg, status_code=500, media_type="text/plain")
         finally:
@@ -324,7 +324,7 @@ async def delete_data(image_id: str, item_id: int, session=Depends(get_session),
             msg = f"Deleted item_id={obj} in `{image_id}/annotation` successfully. "
             return Response(content=msg, status_code=200, media_type="text/plain")
         except Exception as e:
-            msg = f"Failed to delete item_id={item_id} in `{image_id}/annotation`. {e}"
+            msg = f"Failed to delete item_id={item_id} in `{image_id}/annotation`. {str(e)}"
             # raise HTTPException(status_code=400, detail=str(e))
             return Response(content=msg, status_code=500, media_type="text/plain")
         finally:
@@ -342,10 +342,10 @@ async def read_data(image_id: str, item_id: int, session=Depends(get_session)):
         result = await session.execute(stmt)
         result = result.one_or_none()
         if not result:
-            raise HTTPException(status_code=404, detail=f"Item {item_id} not found")
+            raise HTTPException(status_code=404, detail=f"Item {item_id} not found. ")
         return result[0].to_dict()
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to read item_id={item_id}: {str(e)}")
 
 
 @app.post("/annotation/v1/search")
@@ -494,10 +494,10 @@ async def search_data(image_id: str, item=Body(...), session=Depends(get_session
         async for obj in iterator:
             results.append(obj.to_dict())
         if not results:
-            raise HTTPException(status_code=404, detail="Item not found")
+            raise HTTPException(status_code=404, detail=f"Items not found with query: {item}")
         return results
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to search with query={item}. {str(e)}")
 
 
 @app.post("/annotation/count")
@@ -514,7 +514,7 @@ async def count_data(image_id: str, item=Body(...), session=Depends(get_session)
         return N
     except Exception as e:
         # await session.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Failed to count annotations. {str(e)}")
 
 
 ## websockets should be able to stick to connected worker only. 

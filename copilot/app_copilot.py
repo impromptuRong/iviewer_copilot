@@ -35,8 +35,8 @@ def _get_slide(slide_path):
         slide.attach_reader(osr, engine='simpletiff')
 
         return slide
-    except:
-        raise HTTPException(status_code=404, detail=f"{slide_path} not found")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to load slide from {slide_path}: {str(e)}")
 
 
 def get_roi_tile(request: gr.Request, image_size=(512, 512)):

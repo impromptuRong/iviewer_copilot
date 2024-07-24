@@ -110,8 +110,8 @@ async def _get_slide(slide_path):
         print(f"Excute remote slide: {slide_path}")
         slide = SimpleTiff(slide_path)
         return slide
-    except:
-        raise HTTPException(status_code=404, detail="Slide not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to load slide from {slide_path}: {str(e)}")
 
 
 @alru_cache(maxsize=16)
@@ -132,8 +132,8 @@ async def _get_generator(key):
         )
 
         return generator
-    except:
-        raise HTTPException(status_code=404, detail="DeepZoomGenerator not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get DeepZoomGenerator for {key}: {str(e)}")
 
 
 @app.get("/proxy/dummy.dzi")
@@ -161,8 +161,8 @@ async def proxy_dzi(request: Request):
         print(f"*********************")
 
         return Response(content=dzi, media_type="application/xml")
-    except Exception:
-        raise HTTPException(status_code=404, detail="DZI not found.")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get dzi for {key}: {str(e)}")
 
 
 @app.get("/proxy/dummy_files/{level}/{col}_{row}.{format}", status_code=201)
@@ -230,8 +230,8 @@ async def proxy_tile(
         await client.aclose()
 
         return "Success."
-    except ValueError:
-        raise HTTPException(status_code=404, detail="Invalid level or coordinates")
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Failed to get image tile for {key}: {str(e)}")
 
 
 async def test_connection():
