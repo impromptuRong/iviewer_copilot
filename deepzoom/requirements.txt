@@ -12,3 +12,4 @@ redis
 requests
 sqlalchemy
 scikit-image
+uvicorn
