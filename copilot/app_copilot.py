@@ -10,9 +10,15 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from functools import lru_cache
 
-from utils.simpletiff import SimpleTiff
-from utils.utils_image import Slide
-from model_registry import MODEL_REGISTRY
+from agents.utils.simpletiff import SimpleTiff
+from agents.utils.utils_image import Slide
+
+from llm_config import MODEL_REGISTRY, SYSTEM_PROMPT, RAG_PROMPT
+from agents import AgentRegistry, RAGRouter, resize_pil
+
+## Image Caption, LLM, RAG Registries
+init_nodes = {'image', 'roi', 'mpp', 'core_nuclei_types', 'annotations', 'description',}
+PATCH_SIZE = (512, 512)
 
 ## TODO: 
 # 1. Implement MultimodalTextbox: https://www.gradio.app/docs/gradio/multimodaltextbox
@@ -22,7 +28,7 @@ from model_registry import MODEL_REGISTRY
 
 
 annotation_hostname = os.environ.get('ANNOTATION_HOST', 'localhost')
-annotation_port = os.environ.get('ANNOTATION_PORT', '9020')
+annotation_port = os.environ.get('ANNOTATION_PORT', '10020')
 database_hostname = f"http://{annotation_hostname}:{annotation_port}"
 
 
@@ -39,14 +45,11 @@ def _get_slide(slide_path):
         raise HTTPException(status_code=404, detail=f"Failed to load slide from {slide_path}: {str(e)}")
 
 
-def get_roi_tile(request: gr.Request, image_size=(512, 512)):
-    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-
+def get_roi_tile(file, roi, image_size=(512, 512)):
     ## Pull ROI from slide
-    slide = _get_slide(request_args['file'])
+    slide = _get_slide(file)
     max_w, max_h = slide.level_dims[0]
-    x0, y0 = float(request_args['x0']), float(request_args['y0'])
-    x1, y1 = float(request_args['x1']), float(request_args['y1'])
+    x0, y0, x1, y1 = roi
     # we add a padding of min(10, roi_h/w * 0.1) pixels
     pad_l = pad_r = min(10, (x1 - x0) * 0.1)
     pad_u = pad_d = min(10, (y1 - y0) * 0.1)
@@ -81,29 +84,54 @@ def get_roi_annotations(request_url, criteria={}):
         return {}
 
 
-def onload(db_state, request: gr.Request):
+def onload(request: gr.Request):
     request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-    image_id, registry = request_args['image_id'], request_args['registry']
-
-    client = MODEL_REGISTRY.get_caption_model(request_args['registry'])
-    print(f"Using client {request_args['registry']} (model={client.model})")
-    image_size = client.configs.get('image_size', (512, 512))
-    patch = get_roi_tile(request, image_size)
-    # patch = go.Figure(go.Image(z=np.array(patch)))
-
-    request_url = f"{database_hostname}/annotation/search?image_id={image_id}"
-    criteria = {**request_args,}  # 'annotator': ['yolov8-lung']} 'label': ['tumor', 'immune']}
-    res = get_roi_annotations(request_url, criteria=criteria)
-
-    msg = request_args.get('description')
-    return patch, [[None, msg]], msg or '', res
-
-
-def generate_comment(comment, db_state, request: gr.Request):
-    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-    
+    image_id, file = request_args['image_id'], request_args['file']
     x0, y0 = float(request_args['x0']), float(request_args['y0'])
     x1, y1 = float(request_args['x1']), float(request_args['y1'])
+    patch = get_roi_tile(file, [x0, y0, x1, y1], PATCH_SIZE)
+    # patch = go.Figure(go.Image(z=np.array(patch)))
+
+    ## build agent_registry and rag_router
+    agent_registry = AgentRegistry(init_nodes)
+    agent_registry.update_cache('image', patch)  # add image patch
+    agent_registry.update_cache('roi', [x0, y0, x1, y1])  # add roi coordinates
+    agent_registry.update_cache('mpp', 0.25)  # add slide mpp
+    agent_registry.update_cache('core_nuclei_types', ['tumor_nuclei', 'stromal_nuclei', 'immune_nuclei'])
+
+    request_url = f"{database_hostname}/annotation/search?image_id={image_id}"
+    # exclude 'description', otherwise will match db.description == description and return emtpy
+    criteria = {k: v for k, v in request_args.items() if k != 'description'}  # 'annotator': ['yolov8-lung']} 'label': ['tumor', 'immune']}
+    annotations = get_roi_annotations(request_url, criteria=criteria)
+    agent_registry.update_cache('annotations', annotations)  # add annotations
+
+    description = request_args.get('description')
+    agent_registry.update_cache('description', [description])  # add descriptions
+
+    rag_router = RAGRouter.from_agent_registry(
+        agent_registry, 
+        llm=request_args['rag'], 
+        similarity_top_k=3,
+        llm_cfgs={'temperature': 0, 'system_prompt': RAG_PROMPT},
+    )
+
+    agent_state = {
+        'image_id': image_id,
+        'roi': [x0, y0, x1, y1],
+        'agent_registry': agent_registry, 
+        'rag_router': rag_router,
+    }
+    print("***********************************")
+    print(f"Registered Agents: ")
+    print(agent_state['rag_router'].tools.keys())
+    print("***********************************")
+
+    return patch, [[None, description]], description or '', agent_state
+
+
+def generate_comment(comment, agent_state, request: gr.Request):
+    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+    x0, y0, x1, y1 = agent_state['roi']
 
     ## Init a message based on comment
     msg = comment or [[None, '']]
@@ -115,10 +143,11 @@ def generate_comment(comment, db_state, request: gr.Request):
     else:
         ## Run MLLM agents for image caption
         try:
-            client = MODEL_REGISTRY.get_caption_model(request_args['registry'])
-            print(f"Using client {request_args['registry']} (model={client.model})")
-            image_size = client.configs.get('image_size', (512, 512))
-            patch = get_roi_tile(request, image_size)
+            image_patch = agent_state['agent_registry'].cache['image']
+            client = MODEL_REGISTRY.get_caption_model(request_args['caption'])
+            print(f"Using client {request_args['caption']} (model={client.model})")
+            image_size = client.configs.get('image_size', PATCH_SIZE)
+            patch = resize_pil(image_patch, image_size)
             messages = client.build_messages(
                 prompt=client.configs['init_prompts'], 
                 system=client.configs['system'],
@@ -140,7 +169,7 @@ def generate_comment(comment, db_state, request: gr.Request):
 
         ## Run nuclei summary agents
         try:
-            df = pd.DataFrame(db_state)
+            df = pd.DataFrame(agent_state['agent_registry'].cache['annotations'])
             if not df.empty:
                 stats = df['label'].value_counts().to_dict()
                 nuclei_summary = json.dumps(stats)
@@ -160,26 +189,18 @@ def user(user_message, history):
     return "", history
 
 
-def llm_copilot(comment, db_state, history, request: gr.Request):
+def update_description(comment, agent_state):
+    description = comment[0][-1] if comment else ''
+    if description != agent_state['agent_registry'].cache['description']:
+        agent_state['agent_registry'].update_cache('description', [description])
+
+    return agent_state
+
+
+def llm_copilot(agent_state, history, request: gr.Request):
     if history and history[-1][-1] is None:
-        ## Construct messages
-        request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-
-        client = MODEL_REGISTRY.get_chatbot_model(request_args['registry'])
-        print(f"Using client {request_args['registry']} (model={client.model})")
-
-        # build history and messages
-        description = comment[0][-1] if comment else ''
-        messages = client.build_messages(
-            prompt=history[-1][0], 
-            system=client.configs['system'] + description,
-            history=history[:-1],
-        )
-
-        stream = client.stream(
-            messages=messages,
-            options=client.configs.get('options'),
-        )
+        prompt = history[-1][0]
+        stream = agent_state['rag_router'].agent.stream_chat(message=prompt).response_gen
 
         history[-1][-1] = ""
         for chunk in stream:
@@ -190,7 +211,8 @@ def llm_copilot(comment, db_state, history, request: gr.Request):
         yield history
 
 
-def clear_fn():
+def clear_fn(agent_state):
+    agent_state['rag_router'].agent.reset()
     return None
 
 
@@ -225,7 +247,7 @@ footer {visibility: hidden}
 
 with gr.Blocks(css=css) as demo:
     with gr.Column(elem_id="copilot"):
-        db_state = gr.State()
+        agent_state = gr.State()
         with gr.Row():
             image = gr.ImageEditor(
                 elem_id="image", 
@@ -280,37 +302,38 @@ with gr.Blocks(css=css) as demo:
             clear_btn = gr.Button("Clear", elem_classes="button", size='sm', min_width=10)
 
     # Onload run generate_comment
-    comment_fn = demo.load(onload, inputs=[db_state], outputs=[image, comment, editor, db_state]).success(
-        generate_comment, inputs=[comment, db_state], outputs=[comment, editor],
+    comment_fn = demo.load(onload, inputs=None, outputs=[image, comment, editor, agent_state]).success(
+        generate_comment, inputs=[comment, agent_state], outputs=[comment, editor],
     )  #, _js=on_load)
 
     # Click regenerate button: stop onload run, clear comment content, regenerate comment
-    def clear_comment():
-        return None, ''
     comment_regnerate_fn = regenerate_btn.click(
         lambda: (None, ''), inputs=None, outputs=[comment, editor], cancels=[comment_fn], queue=False,
     ).success(
-        generate_comment, inputs=[comment, db_state], outputs=[comment, editor],
+        generate_comment, inputs=[comment, agent_state], outputs=[comment, editor],
     )
     # sync markdown with editor when user edit the content
     editor.input(lambda x: [[None, x]] if x else None, inputs=[editor], outputs=[comment])
 
     # Click Enter after chat: ignore inputs if current chat is still running
     chat_submit_fn = prompt.submit(user, [prompt, chatbot], [prompt, chatbot]).then(
-        llm_copilot, inputs=[comment, db_state, chatbot], outputs=chatbot,
+        update_description, inputs=[comment, agent_state], outputs=[agent_state],
+    ).then(
+        llm_copilot, inputs=[agent_state, chatbot], outputs=chatbot,
     )
-    # chat = prompt.submit(llm_copilot, [prompt, comment, chatbot], [prompt, chatbot])
 
     # Click Chat button: ignore inputs if current chat is still running
     chat_go_fn = go_btn.click(user, [prompt, chatbot], [prompt, chatbot]).then(
-        llm_copilot, inputs=[comment, db_state, chatbot], outputs=chatbot,
+        update_description, inputs=[comment, agent_state], outputs=[agent_state],
+    ).then(
+        llm_copilot, inputs=[agent_state, chatbot], outputs=chatbot,
     )
 
     # Click Stop button: stop ongoging generation and chat
     stop_btn.click(None, None, None, cancels=[comment_fn, comment_regnerate_fn, chat_submit_fn, chat_go_fn], queue=False)
 
     # Click Clear button: stop ongoing chat, clear chatbot content
-    clear_btn.click(clear_fn, None, [chatbot], cancels=[chat_submit_fn, chat_go_fn], queue=False)
+    clear_btn.click(clear_fn, [agent_state], [chatbot], cancels=[chat_submit_fn, chat_go_fn], queue=False)
 
     # Click Hide/Show Image/Comment button: hide/show comment content
     image_toggle_btn.click(toggle_image, [image_state], [image, image_state, image_toggle_btn])

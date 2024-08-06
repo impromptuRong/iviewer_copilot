@@ -32,9 +32,10 @@ ollama serve
 ```
 SLIDES_DIR=input_slides_folder
 DATABASE_DIR=./databases
-OLLAMA_HOST=localhost
-OLLAMA_PORT_CAPTION=11434
-OLLAMA_PORT_CHATBOT=11435
+OLLAMA_HOST_LLM=localhost
+OLLAMA_PORT_LLM=11434
+OLLAMA_HOST_MLLM=localhost
+OLLAMA_PORT_MLLM=11435
 OPENAI_API_KEY=openai_api_key
 ```
 I-Viewer rely on `ollama` or `openai API` to enable chatbot and captioning service. For GPT user, put openai_api_key into the `.env` file as above. For `ollama` user, we recommend to host ollama service on a separate server. (Instructions about how to set up ollama and LLM models can be found here: https://github.com/ollama/ollama)
@@ -46,46 +47,39 @@ docker compose up -d
 
 Then you can connect the backend API with frontend server. Or view a demo by opening the `./templates/index.html`
 
-## Extend I-Viewer with customer analysis pipeline
-User can add their own pipeline into I-Viewer with `offline` interface and `online` interface. Basically it takes three steps:
+## Adding Agents to I-Viewer Copilot
+User can integrate additional agent into the RAG system through function registration. The function registration requires the following parameters:
+1. name: the name of this agent, must be unique.
+2. type: the type of this agent, one of `FunctionTool` or `QueryEngineTool` or None. (More llama_index tool will be supported in future)
+3. input_mapping: this will map function args with RAG memory. 
+4. output_mapping: this will map the agent output to the RAG memory, results in RAG memory can be further used by other functions for chain of thoughts and hierarchical agent calling.
+5. description: the detail description about the agent, what can the agent do, what types of results the agent can provide. The RAG system will heavily rely on the description to determine answering logic. 
+6. return_direct: whether to directly return function results, or wrap the results into language template.
+
+The following example registered a basic function to summarize nuclei composition in annotation databases. In the I-Viewer, `image`, `annotations`, `roi`, `description` information will be auto-loaded when the copilot window start.
 ```
-## Create a generator agent
-class GeneratorAgent:
-    def prepare_inputs(self, requests):
-        request_params = decode(requests)
-        boxes = get_bbox(request_params)
-        roi_image = get_roi_tile(request_params)
-        ...
-        
-        return {'roi_image': roi_image, 'boxes': boxes, ...}
+## Basic nuclei summary function
+description = f"""\
+    Summarize the nuclei information from a given dataframe. \
+    This tool calculates the statistical summary of nuclei for each different type. 
+    Use this tool to answer user questions about percentage, count about nuclei.
+"""
+@register_agent(
+    name='nuclei_composition',
+    type='FunctionTool',
+    input_mapping={'entries': 'annotations',},
+    output_mapping='nuclei_composition_statistics',
+    description=description,
+    return_direct=False,
+)
+def nuclei_composition_summary(entries):
+    df = pd.DataFrame(entries)
+    if not df.empty:
+        res = df['label'].value_counts().to_dict()
+    else:
+        res = {}
     
-    def analysis_offline(self, inputs):
-        serialized_item = serialize(inputs)
-        await redis_client.stream_push(registry, serialized_item)
-    
-    def analysis_online(self, inputs):
-        outputs = agents.analysis_online(inputs)
-        return Response(outputs)
-
-## Create a analysis agent
-class AnalysisAgent:
-    def predict(self, inputs):
-        return pipeline(inputs)
-    
-    def analysis_offline(self):
-        serialized_item = redis_client.stream_fetch(registry)
-        inputs = deserilize(serialized_item)
-        outputs = self.predict(inputs)
-        export_to_db(postprocess(outputs))
-
-    def analysis_online(self, inputs):
-        outputs = self.predict(inputs)
-        return postprocess(outputs)
-
-## Register model and generator
-MODEL_REGISTRY = ModelRegistry()
-MODEL_REGISTRY.register("registry_name", "model", AnalysisAgent)
-MODEL_REGISTRY.register("registry_name", "generator", GeneratorAgent)
+    return res
 ```
 
 ## License

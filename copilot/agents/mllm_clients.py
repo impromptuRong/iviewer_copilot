@@ -1,5 +1,3 @@
-import json
-import time
 import base64
 import openai
 import ollama
@@ -9,8 +7,10 @@ from io import BytesIO
 
 
 def resize_pil(img, output_size, keep_ratio=True, resample=Image.BILINEAR):
+    w0, h0 = img.size
+    if w0 == output_size[0] and h0 == output_size[1]:
+        return img
     if keep_ratio:
-        w0, h0 = img.size
         factor = min(output_size[0] / w0, output_size[1] / h0)
         output_size = (int(w0 * factor), int(h0 * factor))
     

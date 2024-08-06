@@ -109,8 +109,9 @@ services:
     environment:
       - ANNOTATION_HOST=annotation
       - ANNOTATION_PORT=9020
-      - OLLAMA_HOST=${OLLAMA_HOST}
-      - OLLAMA_PORT_CAPTION=${OLLAMA_PORT_CAPTION}
-      - OLLAMA_PORT_CHATBOT=${OLLAMA_PORT_CHATBOT}
+      - OLLAMA_HOST_LLM=${OLLAMA_HOST_LLM}
+      - OLLAMA_PORT_LLM=${OLLAMA_PORT_LLM}
+      - OLLAMA_HOST_MLLM=${OLLAMA_HOST_MLLM}
+      - OLLAMA_PORT_MLLM=${OLLAMA_PORT_MLLM}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - NO_PROXY=localhost,127.0.0.1,annotation,${OLLAMA_HOST},api.openai.com
+      - NO_PROXY=localhost,127.0.0.1,annotation,${OLLAMA_HOST_LLM},${OLLAMA_HOST_MLLM},api.openai.com
