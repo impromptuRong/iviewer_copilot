@@ -49,7 +49,7 @@ gpt4v = {
     'image_size': (512, 512),
     'options': gpt_parameters,
 }
-MODEL_REGISTRY.register("caption", "gpt4v", GPTClient(gpt4v))
+MODEL_REGISTRY.register("caption", "gpt-4v", GPTClient(gpt4v))
 
 gpt4o = {
     'model': 'gpt-4o',
@@ -58,7 +58,7 @@ gpt4o = {
     'image_size': (512, 512),
     'options': gpt_parameters,
 }
-MODEL_REGISTRY.register("caption", "gpt4o", GPTClient(gpt4o))
+MODEL_REGISTRY.register("caption", "gpt-4o", GPTClient(gpt4o))
 
 ##################################################
 llama3 = {
@@ -66,18 +66,18 @@ llama3 = {
     'system': SYSTEM_PROMPT + CHATBOT_PROMPT,
     'options': ollama_parameters,
 }
-MODEL_REGISTRY.register("chatbot", "llama3", OllamaClient(llama3, host=OLLAMA_SERVER_LLM))
+MODEL_REGISTRY.register("chatbot", "llama3.1", OllamaClient(llama3, host=OLLAMA_SERVER_LLM))
 
 gpt4o_mini = {
     'model': 'gpt-4o-mini',
     'system': SYSTEM_PROMPT + CHATBOT_PROMPT,
     'options': gpt_parameters,
 }
-MODEL_REGISTRY.register("chatbot", "gpt4o_mini", GPTClient(gpt4o_mini))
+MODEL_REGISTRY.register("chatbot", "gpt-4o-mini", GPTClient(gpt4o_mini))
 
 gpt35 = {
     'model': 'gpt-3.5-turbo',
     'system': SYSTEM_PROMPT + CHATBOT_PROMPT,
     'options': gpt_parameters,
 }
-MODEL_REGISTRY.register("chatbot", "gpt35", GPTClient(gpt35))
+MODEL_REGISTRY.register("chatbot", "gpt-3.5", GPTClient(gpt35))

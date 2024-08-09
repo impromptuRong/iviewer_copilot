@@ -46,7 +46,7 @@
         const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=slide`;
         const paramAPI = `http://${server}:10010/proxy/params?image_id=${imgId}&registry=slide`;
         const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=yolov8-lung`;
-        const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=gpt4o`;
+        const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=${slideFolder}%2F${imgName}&caption=gpt-4o&rag=gpt-4o`;
 
         const database_url = `${server}:10020/annotation`;
         const createDB = `http://${database_url}/create?image_id=${imgId}`;
