@@ -15,4 +15,5 @@ torch
 torchvision
 scikit-image
 llama_index
+llama-index-llms-ollama
 uvicorn

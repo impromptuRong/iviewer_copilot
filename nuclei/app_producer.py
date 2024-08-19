@@ -139,12 +139,11 @@ async def _get_generator(key):
 @app.get("/proxy/dummy.dzi")
 async def proxy_dzi(request: Request):
     """ Serve slides and different registries to openseadragon. """
+    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+    print(f"{request_args}")
+    image_id, registry = request_args['image_id'], request_args['registry']
+    key = f"{image_id}_{registry}"
     try:
-        request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-        print(f"{request_args}")
-        image_id, registry = request_args['image_id'], request_args['registry']
-        # image_id = image_id.replace('/', '%2F').replace(':', '%3A')
-        key = f"{image_id}_{registry}"
         default_args = DZI_SETTINGS.get(registry, DZI_SETTINGS['default'])
 
         cfgs = {**default_args, **request_args}
@@ -170,14 +169,12 @@ async def proxy_tile(
     level: int, col: int, row: int, format: str, request: Request,
     client=Depends(get_redis), 
 ):
+    request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
+    image_id, registry = request_args['image_id'], request_args['registry']
+    project_id = request_args.get('project_id', '')
+    group_id = request_args.get('group_id', '')
+    key = f"{image_id}_{registry}"
     try:
-        request_args = {k.split('amp;')[-1]: v for k, v in request.query_params.items()}
-        image_id, registry = request_args['image_id'], request_args['registry']
-        project_id = request_args.get('project_id', '')
-        group_id = request_args.get('group_id', '')
-        # image_id = image_id.replace('/', '%2F').replace(':', '%3A')
-        key = f"{image_id}_{registry}"
-
         generator = await _get_generator(key)
         settings = await setting_cache.get(key)
         assert settings.server is not None, f"settings.server({settings.server}) shouldn't be none."
