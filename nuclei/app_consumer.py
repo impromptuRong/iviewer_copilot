@@ -1,24 +1,16 @@
 import os
-import cv2
 import time
-import json
 import redis
 import pickle
-import requests
-import numpy as np
-import pandas as pd
-from PIL import Image
-from io import BytesIO
+import argparse
 from functools import lru_cache
 
 from sqlalchemy import create_engine, insert, select
-from sqlalchemy import or_, and_
+from sqlalchemy import and_
 from sqlalchemy.orm import sessionmaker
 
-from utils.db import Base, Annotation, Cache
-
-import config
-from model_registry import MODEL_REGISTRY
+from utils.db import Annotation, Cache
+from model_registry import MODEL_REGISTRY, AGENT_CONFIGS
 
 
 # SQLAlchemy setup
@@ -40,15 +32,6 @@ def get_sessionmaker(image_id):
     session = sessionmaker(engine, expire_on_commit=False)
 
     return session
-
-
-def test_run(service, image="http://images.cocodataset.org/val2017/000000039769.jpg"):
-    print(f"Testing service for {image}")
-    st = time.time()
-    image = Image.open(requests.get(image, stream=True).raw)
-    r = service([np.array(image)])
-
-    print(f"{generated_text} ({time.time()-st}s)")
 
 
 def entry_exists_in_cache(query, session):
@@ -78,9 +61,9 @@ def export_to_db(entry):
                 print(f"db_cache:{image_id} already analyzed query: {query}.")
             session.commit()
             return {"message": "Write successfully!", "status": 1}
-        except:
+        except Exception as e:
             session.rollback()
-            return {"message": "Failed to write!", "status": 0}
+            return {"message": f"Failed to write to db: {e}!", "status": 0}
         finally:
             session.close()
             lock.release()
@@ -89,7 +72,11 @@ def export_to_db(entry):
         return {"message": f"Failed to acquire `db_lock:{image_id}`.", "status": -1}
 
 
-def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
+def run(registry, max_halt=None, max_latency=0.5, max_write_attempts=5):
+    config = AGENT_CONFIGS[registry]
+    service = MODEL_REGISTRY.load_service(config)
+    print(f"Successfully load model {registry}.")
+
     global_running = True
     max_halt = max_halt or float('inf')
     batch_inputs = []
@@ -97,8 +84,8 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
     st = time.time()
 
     while time.time() - st < max_halt and global_running:
-        if client.exists(config.model_name):
-            serialized_entry = client.rpop(config.model_name)
+        if client.exists(registry):
+            serialized_entry = client.rpop(registry)
             entry = pickle.loads(serialized_entry)
             # entry = json.loads(serialized_entry)
             batch_inputs.append((
@@ -107,7 +94,7 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
                 entry['extra'], 
             ))
             batch_images.append(entry['img'])   # bytes2numpy(entry['img']) for json
-            print(f"Retrieve entry from queue (size={client.llen(config.model_name)}): {len(batch_inputs)}")
+            print(f"Retrieve entry from queue (size={client.llen(registry)}): {len(batch_inputs)}")
         else:
             time.sleep(0.1)
 
@@ -137,9 +124,10 @@ def run(service, max_halt=None, max_latency=0.5, max_write_attempts=5):
 
 
 if __name__ == "__main__":
-    service = MODEL_REGISTRY.get_model(config.model_name)(
-        config, device=config.device
-    )
-    # test_run(service)
-    
-    run(service)
+    parser = argparse.ArgumentParser(description="Script with a required positional argument.")
+    parser.add_argument('registry', type=str, help='The registry name')
+    args = parser.parse_args()
+
+    registry = args.registry
+    assert registry in AGENT_CONFIGS, f"AGENT_CONFIGS do not have registry: {registry}."
+    run(args.registry)

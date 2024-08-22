@@ -5,6 +5,8 @@ import torch
 import torchvision
 import numpy as np
 import pandas as pd
+
+from PIL import Image
 from io import BytesIO
 
 
@@ -13,7 +15,7 @@ def approx_poly_epsilon(contour, factor=0.01):
         Smaller epsilon: tighter approximation to the original contour. It tends to preserve more details of the contour, resulting in a polygon with more vertices that closely follows the original shape.
         Larger epsilon: Conversely, a larger value of epsilon leads to a looser approximation. It simplifies the contour by reducing the number of vertices. This can result in a smoother, less detailed polygon that approximates the overall shape of the original contour.
     """
-    area = cv2.contourArea(contour)
+    # area = cv2.contourArea(contour)
     perimeter = cv2.arcLength(contour, True)
     # Define a factor to control the trade-off between detail and simplification
     
@@ -224,7 +226,7 @@ def non_max_suppression(
         if mps:
             output[xi] = output[xi].to(device)
         if (time.time() - t) > time_limit:
-            LOGGER.warning(f'NMS time limit {time_limit:.3f}s exceeded')
+            print(f'NMS time limit {time_limit:.3f}s exceeded')
             break  # time limit exceeded
 
     return output

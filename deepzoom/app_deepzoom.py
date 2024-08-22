@@ -1,25 +1,14 @@
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
 from aiocache import Cache
 from aiocache.serializers import PickleSerializer, JsonSerializer
-
-from typing import Optional
 from async_lru import alru_cache
-from collections.abc import Callable
-from io import BytesIO
 
 import os
-import cv2
-import json
-import time
-import requests
-import numpy as np
-import pandas as pd
-from PIL import Image
 from io import BytesIO
 from tifffile import TiffFile
 
+from utils.db import DeepZoomSettings
 from utils.simpletiff import SimpleTiff
 from utils.deepzoom import DeepZoomGenerator
 from utils.utils_image import Slide
@@ -77,16 +66,6 @@ DZI_SETTINGS = {
         'server': 'SAM',
     },
 }
-
-
-class DeepZoomSettings(BaseModel):
-    file: str = None
-    format: str = 'jpeg'
-    tile_size: int = 254
-    overlap: int = 1
-    limit_bounds: bool = True
-    tile_quality: int = 75
-    server: Optional[str] = None
 
 
 redis_host = os.environ.get('REDIS_HOST', 'localhost')

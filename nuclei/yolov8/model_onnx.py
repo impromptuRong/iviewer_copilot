@@ -38,12 +38,12 @@ class Yolov8SegmentationONNX:
     def get_info(self):
         return {
             'input_name': self.input_name, 
-            'output_names': self.outptu_names, 
+            'output_names': self.output_names, 
             'input_size': self.input_size, 
             'model_dtype': self.model_dtype,
        }
 
-    def __call__(self, images, patch_infos=None, nms_params={}, preprocess=True):
+    def __call__(self, images, nms_params={}, preprocess=True):
         s0 = time.time()
         if preprocess:
             inputs, image_sizes = self.preprocess(images)
@@ -149,3 +149,14 @@ class Yolov8SegmentationONNX:
         print(f"Export table: {time.time() - st}s.")
 
         return df.to_dict(orient='records')
+
+    def test_run(self, image="http://images.cocodataset.org/val2017/000000039769.jpg"):
+        import requests
+        from PIL import Image
+
+        print(f"Testing service for {image}")
+        st = time.time()
+        image = Image.open(requests.get(image, stream=True).raw)
+        r = self.__call__([np.array(image)])
+
+        print(f"Test service: {len(r)} ({time.time()-st}s)")

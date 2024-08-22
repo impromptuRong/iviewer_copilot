@@ -1,0 +1,16 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY nuclei/. .
+COPY utils ./utils
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Download the onnx and TensorRT model weight
+RUN pip install gdown
+RUN mkdir -p /app/ckpts/nuclei-yolov8-colon
+RUN gdown 1KD4jIj-DbKqahdX2fW-MhtZH06gRdVne -O /app/ckpts/nuclei-yolov8-colon/best.onnx
+
+# RUN export no_proxy="localhost"
+
+CMD ["python", "app_consumer.py", "yolov8-colon"]

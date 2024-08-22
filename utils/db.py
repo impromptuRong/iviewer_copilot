@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Float, String, Integer, Table, DateTime
 from sqlalchemy.orm import DeclarativeBase
 # from sqlalchemy.ext.declarative import declarative_base
+from pydantic import BaseModel
+from typing import Dict, Optional, Any
 from datetime import datetime
 
 
@@ -43,3 +45,33 @@ class Cache(Base):
     registry = Column(String, index=True)
     tile_id = Column(String)
     # status = Column(String)
+
+
+class DeepZoomSettings(BaseModel):
+    file: str
+    format: str = 'jpeg'
+    tile_size: int = 254
+    overlap: int = 1
+    limit_bounds: bool = True
+    tile_quality: int = 75
+    server: Optional[str] = None
+
+
+class WSIConfig(BaseModel):
+    wsi_params: Dict[str, Any] = {
+        "default_mpp": 0.25,
+        "wsi_patch_size": 512,
+        "wsi_padding": 64,
+        "wsi_page": 0,
+        "mask_alpha": 0.3,
+    }
+    tiff_params: Dict[str, Any] = {
+        "tile": (1, 256, 256), 
+        "photometric": "RGB",
+        "compression": "zlib", # compression=('jpeg', 95),  # None RGBA, requires imagecodecs
+        "compressionargs": {"level": 8},
+    }
+    roi_names: Dict[str, Any] = {
+        "tissue": True,  # use tissue region as roi
+        "xml": '.*',  # use all annotations in slide_id.xml 
+    }

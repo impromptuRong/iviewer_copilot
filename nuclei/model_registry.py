@@ -1,4 +1,4 @@
-from yolov8 import Yolov8SegmentationONNX, Yolov8Generator
+from yolov8 import Yolov8SegmentationONNX, Yolov8Generator, Yolov8Config
 
 class ModelRegistry:
     __entry__ = ['model', 'generator']
@@ -14,27 +14,32 @@ class ModelRegistry:
     
     def get_generator(self, name):
         return self._registry['generator'].get(name)
-    
+
+    def load_service(self, config, test=False):
+        service = self.get_model(config.server)(
+            config, device=config.device
+        )
+        if test:
+            service.test_run()
+
+        return service
+
     def info(self):
         return self._registry
         
 
 MODEL_REGISTRY = ModelRegistry()
-
-def register_model(name):
-    def decorator(cls):
-        MODEL_REGISTRY.registry(name, 'model', cls)
-        return cls
-    return decorator
-
-def register_generator(name):
-    def decorator(cls):
-        MODEL_REGISTRY.registry(name, 'generator', cls)
-        return cls
-    return decorator
-
-
 # MODEL_REGISTRY.register("HDYolo", "model", Yolov8SegmentationONNX)
 # MODEL_REGISTRY.register("HDYolo", "generator", Yolov8Generator)
-MODEL_REGISTRY.register("yolov8-lung", "model", Yolov8SegmentationONNX)
-MODEL_REGISTRY.register("yolov8-lung", "generator", Yolov8Generator)
+MODEL_REGISTRY.register("yolov8", "model", Yolov8SegmentationONNX)
+MODEL_REGISTRY.register("yolov8", "generator", Yolov8Generator)
+
+
+AGENT_CONFIGS = {
+    'yolov8-lung': Yolov8Config(
+        model_path = "./ckpts/nuclei-yolov8-lung/best.onnx",
+    ),
+    'yolov8-colon': Yolov8Config(
+        model_path = "./ckpts/nuclei-yolov8-colon/best.onnx",
+    ),
+}

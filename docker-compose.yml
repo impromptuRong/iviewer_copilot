@@ -51,12 +51,14 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
 
-  hdyolo:
-    image: iviewer-hdyolo:latest
-    container_name: iviewer-hdyolo
+  nuclei:
+    image: iviewer-nuclei:latest
+    container_name: iviewer-nuclei
     build:
       context: .
-      dockerfile: ./nuclei/Dockerfile.agent
+      dockerfile: ./nuclei/Dockerfile.queue
+    ports:
+      - "10030:9030"
     depends_on:
       - redis
     networks:
@@ -69,17 +71,34 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
   
-  nuclei:
-    image: iviewer-nuclei:latest
-    container_name: iviewer-nuclei
+  yolov8_lung:
+    image: iviewer-yolov8-lung:latest
+    container_name: iviewer-yolov8-lung
     build:
       context: .
-      dockerfile: ./nuclei/Dockerfile.queue
-    ports:
-      - "10030:9030"
+      dockerfile: ./nuclei/Dockerfile.yolov8-lung
     depends_on:
       - redis
-      - hdyolo
+      - nuclei
+    networks:
+      - iviewer-network
+    volumes:
+      - ${SLIDES_DIR}:/app/abc
+      - ${DATABASE_DIR}:/app/databases
+    environment:
+      - DATABASE_PATH=/app/databases
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+
+  yolov8_colon:
+    image: iviewer-yolov8-colon:latest
+    container_name: iviewer-yolov8-colon
+    build:
+      context: .
+      dockerfile: ./nuclei/Dockerfile.yolov8-colon
+    depends_on:
+      - redis
+      - nuclei
     networks:
       - iviewer-network
     volumes:

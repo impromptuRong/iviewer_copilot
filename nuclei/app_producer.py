@@ -1,7 +1,5 @@
 from fastapi import FastAPI, HTTPException, Request, Response, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Optional
 
 import redis.asyncio as redis
 from aiocache import Cache
@@ -9,19 +7,13 @@ from aiocache.serializers import PickleSerializer, JsonSerializer
 from async_lru import alru_cache
 
 import os
-import cv2
-import json
-import time
 import pickle
-import asyncio
 import numpy as np
-import pandas as pd
-from PIL import Image
-from io import BytesIO
 
+from utils.db import DeepZoomSettings
 from utils.simpletiff import SimpleTiff
 from utils.utils_image import Slide, pad_pil
-from model_registry import MODEL_REGISTRY
+from model_registry import MODEL_REGISTRY, AGENT_CONFIGS
 
 
 # Redis connection
@@ -41,58 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-DZI_SETTINGS = {
-    'slide': {
-        'format': 'jpeg', 
-        'tile_size': 254, 
-        'overlap': 1, 
-        'limit_bounds': False, 
-        'tile_quality': 75,
-        'server': None,
-    },
-    'masks': {
-        'format': 'png', 
-        'tile_size': 254, 
-        'overlap': 1, 
-        'limit_bounds': False, 
-        'tile_quality': 50,
-        'server': None,
-    },
-    'default': {
-        'format': 'jpeg', 
-        'tile_size': 254, 
-        'overlap': 1, 
-        'limit_bounds': False, 
-        'tile_quality': 75,
-        'server': None,
-    },
-    'yolov8-lung': {
-        'format': 'jpeg', 
-        'tile_size': 512, 
-        'overlap': 64, 
-        'limit_bounds': False, 
-        'tile_quality': 50,
-        'server': 'yolov8-lung',
-    },
-    'SAM': {
-        'format': 'png', 
-        'tile_size': 512, 
-        'overlap': 64, 
-        'limit_bounds': False, 
-        'tile_quality': 75,
-        'server': 'SAM',
-    },
-}
-
-
-class DeepZoomSettings(BaseModel):
-    file: str = None
-    format: str = 'jpeg'
-    tile_size: int = 254
-    overlap: int = 1
-    limit_bounds: bool = True
-    tile_quality: int = 75
-    server: Optional[str] = None
 
 setting_cache = Cache(
     Cache.REDIS,
@@ -144,17 +84,15 @@ async def proxy_dzi(request: Request):
     image_id, registry = request_args['image_id'], request_args['registry']
     key = f"{image_id}_{registry}"
     try:
-        default_args = DZI_SETTINGS.get(registry, DZI_SETTINGS['default'])
-
-        cfgs = {**default_args, **request_args}
-        setting = DeepZoomSettings(**cfgs)
+        cfg = AGENT_CONFIGS[registry]
+        dzi_params = {'server': cfg.server, **cfg.dzi_settings, **request_args}
+        setting = DeepZoomSettings(**dzi_params)
 
         await setting_cache.set(key, setting) # , ttl=600)  # setting_cache[key] = setting
         generator = await _get_generator(key)
         dzi = generator.get_dzi()
         print(f"*********************")
         print(f"proxy_dzi: {key} -> {setting}")
-        print(default_args, request_args, cfgs)
         print(f"check if {key} is in cache: {await setting_cache.get(key)}")
         print(f"generator parameters: {generator.tile_size, generator.overlap}")
         print(f"*********************")
