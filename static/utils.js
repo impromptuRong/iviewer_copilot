@@ -1,32 +1,16 @@
-// Color Palette
-class ColorPalette {
-    constructor(colorPalette={}, defaultColor='#E8E613') {  // '#fd7e14'
-        this.colorPalette = colorPalette;
-        this.defaultColor = defaultColor;
-    }
+// Add a button to OSD viewer
+function generateButton(viewer) {
+    let button = new OpenSeadragon.Button({
+        tooltip: 'Display',
+        id: 'display_tree',
+        srcRest: "../static/images/button_rest.png",
+        srcGroup: "../static/images/button_grouphover.png",
+        srcHover: "../static/images/button_hover.png",
+        srcDown: "../static/images/button_pressed.png",
+    });
+    viewer.addControl(button.element, { anchor: OpenSeadragon.ControlAnchor.TOP_LEFT });
 
-    addColor(label, color) {
-        if (this.colorPalette[label] === undefined) {
-            this.colorPalette[label] = color;
-        } else {
-            throw new Error(`label=${label} exists in Palette. `);
-        }
-    }
-
-    getColor(label, defaultColor=null) {
-        if (this.colorPalette[label] === undefined) {
-            let newColor = defaultColor || this.defaultColor;
-            this.addColor(label, newColor);
-        }
-
-        let color = this.colorPalette[label];
-        return {'border': color + 'ff', 'face': color + '35', 
-                'box-shadow': `0 0 0 10px ${color}, inset 0 0 0 10px ${color}` }
-    }
-
-    labels() {
-        return Object.keys(this.colorPalette);
-    }
+    return button
 }
 
 function parseDatabaseAnnotation(ann, colorPalette) {
@@ -559,7 +543,7 @@ function getCurrentViewport(viewer) {
     return bbox;
 }
 
-function drawNUpdateDatatable(api, query, colorPalette){
+function drawNUpdateDatatable(api, query){
     if (query.annotator.length > 0) { //only draw rows with selected manual annotator in the table
         searchAnnotations(api, query).then(ann => {
             if ($.fn.DataTable.isDataTable('#dataTable')) {
@@ -602,7 +586,7 @@ function drawNUpdateDatatable(api, query, colorPalette){
                             text: '<i class="fas fa-sync-alt" style="margin-right: 5px"></i>Reload Table',
                             className: 'btn-sm btn-dt',
                             action: function (e, dt, button, config) {
-                                drawNUpdateDatatable(api, query, colorPalette); // Call function to download all annotations
+                                drawNUpdateDatatable(api, query); // Call function to download all annotations
                             }
                         }
                     ]

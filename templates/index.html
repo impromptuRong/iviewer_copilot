@@ -31,7 +31,7 @@
         const userId = "1";
         const userName = "user";
         const userIdNameMap = {"1": "user", "yolov8-lung": "yolov8-lung",};
-        const colorPalette = new ColorPalette({
+        const colorPalette = {
             'bg': "#ffffff",
             'tumor_nuclei': "#00ff00",
             'stromal_nuclei': "#ff0000",
@@ -40,7 +40,7 @@
             'macrophage': "#ffff00",
             'dead_nuclei': "#0094e1",
             'other_nuclei': "#646464",
-        });
+        };
 
         const server = 'localhost'
         const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=slide`;
@@ -98,6 +98,7 @@
     <div id="manual-toolbar" class="inner"></div>
     <div id="model-toolbar">
         <button id="yolo" value="off" type="button">HDYolo</button>
+        <button id="showColor" value="off" type="button">Show Label Colors</button>
     </div>
     <div id="coords">
         <label for="coordX">x:</label>
@@ -171,7 +172,7 @@ $(function() {
             'COMMENT',
             {
                 widget: 'TAG', 
-                vocabulary: colorPalette.labels(),
+                vocabulary: Object.values(colorPalette),
             },
             aiChatBox,
             AnnotatorWidget,
@@ -180,13 +181,16 @@ $(function() {
             tools: ['rect', 'polygon', 'circle', 'ellipse', 'freehand'],
             container: document.getElementById('manual-toolbar'), 
         },
+        'colorPalette': {
+            colors: colorPalette,
+            container: document.getElementById("showColor"),
+            default: '#E8E613',
+        },
     });
-    annotationLayer.colorPalette = colorPalette; // Replace colorPalette with global one
 
     annotationLayer.buildConnections(createDB, getAnnotator, getLabels, insert, read, update, deleteanno, search, stream, count);
     annotationLayer.enableEditing(userId);
     annotationLayer.draw(); // annotationLayer.hide();
-    // viewer.addHandler('viewport-change', annotationLayer.renderActive);
 
     // Add a scale bar
     viewer.scalebar({
@@ -218,15 +222,7 @@ $(function() {
     });
 
     // Add a button to control layer display.
-    let nucleiButton = new OpenSeadragon.Button({
-        tooltip: 'Display',
-        id: 'display_tree',
-        srcRest: "../static/images/button_rest.png",
-        srcGroup: "../static/images/button_grouphover.png",
-        srcHover: "../static/images/button_hover.png",
-        srcDown: "../static/images/button_pressed.png",
-    });
-    viewer.addControl(nucleiButton.element, { anchor: OpenSeadragon.ControlAnchor.TOP_LEFT });
+    let nucleiButton = generateButton(viewer);
 
     // Link the button to a pop-out multi-selection window.
     nucleiButton.addHandler('click', function(event) {

@@ -47,6 +47,188 @@ class LayerFIFOQueue {
     }
 }
 
+class ColorPalette {
+    static instanceCount = 0;
+    static paletteInstances = {};
+
+    constructor(annotationLayer, colorPalette = {}, defaultColor = '#E8E613') {
+        this.annotationLayer = annotationLayer;
+        this.colorPalette = colorPalette;
+        this.defaultColor = defaultColor;
+        this.isDragging = false;
+        this.offsetX = 0;
+        this.offsetY = 0;
+        this.instanceId = `colorPopUp_${++ColorPalette.instanceCount}`;
+        ColorPalette.paletteInstances[this.instanceId] = this;
+        this.tempColorPalette = { ...colorPalette };  // Temporary storage for changes
+
+        this.createColorPopUp();
+        this.setupDragListeners();
+    }
+
+    getColor(label, defaultColor=null) {
+        let color = this.colorPalette[label] || defaultColor || this.defaultColor;
+        
+        return {'border': color + 'ff', 'face': color + '35', 
+                'box-shadow': `0 0 0 10px ${color}, inset 0 0 0 10px ${color}` }
+    }
+
+    labels() {
+        return Object.keys(this.colorPalette);
+    }
+
+    createColorPopUp() {
+        const colorPopUp = document.createElement('div');
+        colorPopUp.classList.add('colorPopUp');
+        colorPopUp.id = this.instanceId;
+        colorPopUp.innerHTML = `
+            <div>Label Colors</div>
+            <div class="colorList"></div>
+            <div class="popUpButtons">
+                <button onclick="ColorPalette.paletteInstances['${this.instanceId}'].addNewLabel()">Add Label</button>
+                <button onclick="ColorPalette.paletteInstances['${this.instanceId}'].deleteSelectedLabels()">Delete Selected Labels</button>
+                <button onclick="ColorPalette.paletteInstances['${this.instanceId}'].confirmChanges()">Confirm</button>
+                <button onclick="ColorPalette.paletteInstances['${this.instanceId}'].cancelChanges()">Cancel</button>
+            </div>
+        `;
+        document.body.appendChild(colorPopUp);
+        this.colorPopUp = colorPopUp;
+        this.colorList = colorPopUp.querySelector('.colorList');
+    }
+
+    openColorPopUp(button) {
+        this.tempColorPalette = { ...this.colorPalette };  // Reset temporary palette
+        this.generateColorPopUp();
+        const rect = {
+            top: button.offsetTop,
+            left: button.offsetLeft,
+            bottom: button.offsetTop + button.offsetHeight,
+            right: button.offsetLeft + button.offsetWidth
+        };
+        this.colorPopUp.style.left = `${rect.left}px`;
+        this.colorPopUp.style.top = `${rect.bottom}px`;
+        this.colorPopUp.style.display = "block";
+    }
+
+    closeColorPopUp() {
+        this.colorPopUp.style.display = "none";
+    }
+
+    generateColorPopUp() {
+        this.colorList.innerHTML = ''; // Clear previous content
+        for (const [label, color] of Object.entries(this.tempColorPalette)) {
+            this.createLabelRow(label, color);
+        }
+    }
+
+    createLabelRow(label, color) {
+        const labelRow = document.createElement('div');
+        labelRow.classList.add('label-row');
+
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.classList.add('label-checkbox');
+
+        const labelInput = document.createElement('input');
+        labelInput.type = 'text';
+        labelInput.value = label;
+        labelInput.classList.add('label-name');
+
+        labelInput.oninput = () => {
+            const newLabel = labelInput.value.trim();
+            if (newLabel !== "" && newLabel !== label && this.tempColorPalette.hasOwnProperty(newLabel)) {
+                alert(`The label "${newLabel}" already exists. Please choose a different label.`);
+                labelInput.value = label; // Revert to the previous value
+            } else {
+                this.updateLabelInTempMap(label, newLabel, colorInput.value);
+                label = newLabel; // Update the label variable
+            }
+        };
+
+        const colorInput = document.createElement('input');
+        colorInput.type = 'color';
+        colorInput.value = color;
+        colorInput.classList.add('color-input');
+        colorInput.oninput = () => {
+            this.tempColorPalette[label] = colorInput.value;
+        };
+
+        labelRow.appendChild(checkbox);
+        labelRow.appendChild(labelInput);
+        labelRow.appendChild(colorInput);
+
+        this.colorList.appendChild(labelRow);
+    }
+
+    addNewLabel() {
+        const newLabel = this.generateUniqueLabel("New Label");
+        const newColor = this.defaultColor;
+        this.tempColorPalette[newLabel] = newColor;
+        this.createLabelRow(newLabel, newColor);
+    }
+
+    generateUniqueLabel(baseLabel) {
+        let label = baseLabel;
+        let counter = 1;
+        while (this.tempColorPalette.hasOwnProperty(label)) {
+            label = `${baseLabel} ${counter++}`;
+        }
+        return label;
+    }
+
+    deleteSelectedLabels() {
+        const checkboxes = this.colorPopUp.querySelectorAll('.label-checkbox');
+        checkboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                const labelRow = checkbox.parentElement;
+                const labelInput = labelRow.querySelector('.label-name');
+                const label = labelInput.value;
+
+                delete this.tempColorPalette[label];
+                labelRow.remove();
+            }
+        });
+    }
+
+    updateLabelInTempMap(oldLabel, newLabel, color) {
+        if (oldLabel !== newLabel && newLabel !== "") {
+            delete this.tempColorPalette[oldLabel];
+            this.tempColorPalette[newLabel] = color;
+        }
+    }
+
+    confirmChanges() {
+        this.colorPalette = { ...this.tempColorPalette };  // Apply changes
+        this.closeColorPopUp();
+        this.annotationLayer.clear();
+        this.annotationLayer.draw();
+    }
+
+    cancelChanges() {
+        this.closeColorPopUp();  // Discard temporary changes
+    }
+
+    setupDragListeners() {
+        this.colorPopUp.addEventListener("mousedown", (e) => {
+            if (e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') {
+                this.isDragging = true;
+                this.offsetX = e.clientX - parseInt(window.getComputedStyle(this.colorPopUp).left);
+                this.offsetY = e.clientY - parseInt(window.getComputedStyle(this.colorPopUp).top);
+            }
+        });
+
+        document.addEventListener("mousemove", (e) => {
+            if (this.isDragging) {
+                this.colorPopUp.style.left = `${e.clientX - this.offsetX}px`;
+                this.colorPopUp.style.top = `${e.clientY - this.offsetY}px`;
+            }
+        });
+
+        document.addEventListener("mouseup", () => {
+            this.isDragging = false;
+        });
+    }
+}
 
 class IViewerAnnotation {
     static count = 0;
@@ -97,8 +279,17 @@ class IViewerAnnotation {
         });
         
         // Add a colorPalette to Konva if given.
-        let colorPalette = this.cfs?.colorPalette || {};
-        this.colorPalette = new ColorPalette(colorPalette);
+        let colorPaletteCfgs = this.cfs?.colorPalette || {'colors': {}};
+        let colorPalette = new ColorPalette(
+            this, 
+            colorPaletteCfgs?.colors || {},
+            colorPaletteCfgs?.default || '#E8E613',
+        );
+        let colorButton = colorPaletteCfgs?.container || generateButton(viewer);
+        colorButton.onclick = function() {
+            colorPalette.openColorPopUp(colorButton);
+        };
+        this.colorPalette = colorPalette;
         
         // Add Annotorious Layer
         let widgets = this.cfs?.widgets || [];
@@ -215,7 +406,7 @@ class IViewerAnnotation {
             sendMessageWithRetry(this.webSocket, query);
             this.webSocket.onmessage = (event) => {
                 let ann = JSON.parse(event.data);
-                console.log("return annotation", ann)
+                // console.log("return annotation", ann)
                 let item = this.createKonvaItem(ann);
                 layerQueue.add(item);
             }
@@ -386,7 +577,7 @@ class IViewerAnnotation {
                         filteredActiveAnnotators.push(item);
                     }
                   });
-                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators}, this.colorPalette);
+                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators});
             });
         });
 
@@ -429,7 +620,7 @@ class IViewerAnnotation {
                         filteredActiveAnnotators.push(item);
                     }
                   });
-                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators}, this.colorPalette);
+                drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators});
             });
             this._annotoriousLayer.cancelSelected();
             this._annotoriousLayer.removeAnnotation(annotation);

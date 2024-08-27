@@ -169,3 +169,33 @@ div#view.fullpage {
 .chatbox-widget {
     height: 720px;
 }
+
+.colorPopUp {
+    display: none;
+    position: absolute;
+    border: 1px solid #ddd;
+    background-color: #fff;
+    padding: 10px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    z-index: 10000;
+    width: 300px;
+}
+.label-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+}
+.label-row input[type="text"] {
+    margin-right: 5px;
+    flex: 1;
+}
+.label-row input[type="color"] {
+    margin-left: 5px;
+}
+.colorList {
+    margin-bottom: 10px;
+}
+.popUpButtons {
+    display: flex;
+    gap: 10px;
+}
