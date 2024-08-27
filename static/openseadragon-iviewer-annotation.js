@@ -300,7 +300,7 @@ class IViewerAnnotation {
         });
 
         // Add Annotorious SelectorPack and ToolBars
-        let toolCfgs = this.cfs?.drawingTools || {'tools': ['rect', 'polygon', 'circle', 'ellipse', 'freehand']};
+        let toolCfgs = this.cfs?.drawingTools || {'tools': ['point', 'rect', 'polygon', 'circle', 'ellipse', 'freehand']};
         if (toolCfgs) {
             try {
                 Annotorious.BetterPolygon(this._annotoriousLayer);
@@ -425,7 +425,7 @@ class IViewerAnnotation {
                 'y0': bbox.y0,
                 'x1': bbox.x1,
                 'y1': bbox.y1,
-                'min_box_area': windowArea * 0.0001,
+                'min_box_area': windowArea * 0.0001 - 100,
                 'max_box_area': windowArea,
                 ...cfgs,
             }
@@ -555,7 +555,6 @@ class IViewerAnnotation {
 
         // Update konva object with annotorious changes
         this._annotoriousLayer.on('createAnnotation', annotation => {
-//             let query = w3c2konva(annotation, this.userId);  // JSON.stringify(annotation)
             let query = w3c2konva(annotation);  // JSON.stringify(annotation)
             query['annotator'] = this.userId.toString();
             query['created_at'] = new Date().toISOString();
@@ -643,7 +642,7 @@ class IViewerAnnotation {
     konvaLayers() {
         return this._konvaStage.getLayers();
     }
-    
+
     getLayerQueue(id='konvaLayer-0') {
         return this.layerQueues[id];
     }
@@ -695,6 +694,8 @@ class IViewerAnnotation {
             item = new Konva.Line(itemCfgs);
         } else if (itemCfgs["shape"] == "rect") {
             item = new Konva.Rect(itemCfgs);
+        } else if (itemCfgs["shape"] == "point") {
+            item = new Konva.Star(itemCfgs);
         } else {
             item = new Konva.Ellipse(itemCfgs);
         }

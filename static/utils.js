@@ -20,26 +20,49 @@ function parseDatabaseAnnotation(ann, colorPalette) {
     let polyX = ann.poly_x.split(',');
     let polyY = ann.poly_y.split(',');
 
-    let itemCfgs;
-    if (ann.poly_x.length === 0 || ann.poly_y.length === 0) { // box
-        return {
-            id: ann.id,
-            label: ann.label,
-            description: ann.description,
-            annotator: ann.annotator,
-            project_id: ann.project_id,
-            group_id: ann.group_id,
-            created_at: ann.created_at,
-            fill: color['face'],
-            stroke: color['border'],
-            strokeWidth: 2,
-            draggable: false,
-            shape: "rect",
-            x: parseFloat(ann.x0),
-            y: parseFloat(ann.y0),
-            width: parseFloat(ann.x1) - parseFloat(ann.x0),
-            height: parseFloat(ann.y1) - parseFloat(ann.y0),
-        };
+    if (ann.poly_x.length === 0 || ann.poly_y.length === 0) { // box and point
+        let [x0, y0] = [parseFloat(ann.x0), parseFloat(ann.y0)];
+        let [x1, y1] = [parseFloat(ann.x1), parseFloat(ann.y1)];
+        if (x0 == x1 && y0 == y1) { // point
+            return {
+                id: ann.id,
+                label: ann.label,
+                description: ann.description,
+                annotator: ann.annotator,
+                project_id: ann.project_id,
+                group_id: ann.group_id,
+                created_at: ann.created_at,
+                fill: color['face'],
+                stroke: color['border'],
+                strokeWidth: 2,
+                draggable: false,
+                shape: "point",
+                x: x0,
+                y: y0,
+                numPoints: 6,
+                innerRadius: 5,
+                outerRadius: 10,
+            };
+        } else { // box
+            return {
+                id: ann.id,
+                label: ann.label,
+                description: ann.description,
+                annotator: ann.annotator,
+                project_id: ann.project_id,
+                group_id: ann.group_id,
+                created_at: ann.created_at,
+                fill: color['face'],
+                stroke: color['border'],
+                strokeWidth: 2,
+                draggable: false,
+                shape: "rect",
+                x: parseFloat(ann.x0),
+                y: parseFloat(ann.y0),
+                width: parseFloat(ann.x1) - parseFloat(ann.x0),
+                height: parseFloat(ann.y1) - parseFloat(ann.y0),
+            };
+        }
     } else if (polyX.length === 1 || polyY.length === 1) { // Ellipse and circle
         let itemShape = parseFloat(polyX[0]) === parseFloat(polyY[0]) ? "circle" : "ellipse";
         return {
@@ -129,13 +152,18 @@ function konva2w3c(selectedShape) {
         const {x, y, radiusX, radiusY} = selectedShape.attrs;
         type = "SvgSelector";
         value = `<svg><circle cx="${x}" cy="${y}" r="${radiusX}"></circle></svg>`;
+    } else if (shape === "point") {
+        rectflag = true;
+        const {x, y} = selectedShape.attrs;
+        type = "FragmentSelector";
+        value = `xywh=pixel:${x},${y},0,0`;
     } else {
         rectflag = true;
         const {x, y, width, height} = selectedShape.attrs;
         type = "FragmentSelector";
-        value = `xywh=pixel:${x},${y},${width},${height}`
+        value = `xywh=pixel:${x},${y},${width},${height}`;
     }
- 
+
     const w3cAnnotation = [
         {
             "type": "Annotation",
@@ -326,18 +354,33 @@ function w3c2konva(w3cAnnotation) {
             const parsedY = parseFloat(y);
             const parsedWidth = parseFloat(width);
             const parsedHeight = parseFloat(height);
-            return {
-                label: label,
-                // annotator: userid.toString(),
-                description: description,
-                poly_x: "",
-                poly_y: "",
-                x0: parsedX.toFixed(2),
-                y0: parsedY.toFixed(2),
-                x1: (parsedX + parsedWidth).toFixed(2),
-                y1: (parsedY + parsedHeight).toFixed(2),
-                shape: "rect"
-            };
+            if (parsedWidth == 0 && parsedHeight == 0) {
+                return {
+                    label: label,
+                    // annotator: userid.toString(),
+                    description: description,
+                    poly_x: "",
+                    poly_y: "",
+                    x0: parsedX.toFixed(2),
+                    y0: parsedY.toFixed(2),
+                    x1: (parsedX + parsedWidth).toFixed(2),
+                    y1: (parsedY + parsedHeight).toFixed(2),
+                    shape: "point"
+                };
+            } else {
+                return {
+                    label: label,
+                    // annotator: userid.toString(),
+                    description: description,
+                    poly_x: "",
+                    poly_y: "",
+                    x0: parsedX.toFixed(2),
+                    y0: parsedY.toFixed(2),
+                    x1: (parsedX + parsedWidth).toFixed(2),
+                    y1: (parsedY + parsedHeight).toFixed(2),
+                    shape: "rect"
+                };
+            }
         }
     } else if (svgSelector.startsWith('<svg><path')) {
         const pathMatch = svgSelector.match(/<path d="([^"]*)".*<\/path>/);
