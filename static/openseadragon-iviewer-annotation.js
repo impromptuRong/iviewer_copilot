@@ -61,6 +61,7 @@ class ColorPalette {
         this.instanceId = `colorPopUp_${++ColorPalette.instanceCount}`;
         ColorPalette.paletteInstances[this.instanceId] = this;
         this.tempColorPalette = { ...colorPalette };  // Temporary storage for changes
+        this.hideLabels = new Set();
 
         this.createColorPopUp();
         this.setupDragListeners();
@@ -69,8 +70,13 @@ class ColorPalette {
     getColor(label, defaultColor=null) {
         let color = this.colorPalette[label] || defaultColor || this.defaultColor;
         
-        return {'border': color + 'ff', 'face': color + '35', 
+        if (this.hideLabels.has(label)) {
+            return {'border': color + '00', 'face': color + '00', 
                 'box-shadow': `0 0 0 10px ${color}, inset 0 0 0 10px ${color}` }
+        } else {
+            return {'border': color + 'ff', 'face': color + '35', 
+                'box-shadow': `0 0 0 10px ${color}, inset 0 0 0 10px ${color}` }
+        }
     }
 
     labels() {
@@ -198,6 +204,21 @@ class ColorPalette {
     }
 
     confirmChanges() {
+        let deleteKeys = new Set(Object.keys(this.colorPalette).filter(x => !(x in this.tempColorPalette)));
+        let addKeys = new Set(Object.keys(this.tempColorPalette).filter(x => !(x in this.colorPalette)));
+
+        // Remove keys in deleteKeys from hideLabels
+        for (let key of deleteKeys) {
+            this.hideLabels.add(key);
+        }
+
+        // Add keys in addKeys to hiddenColors
+        for (let key of addKeys) {
+            if (this.hideLabels.has(key)) {
+                this.hideLabels.delete(key);
+            }
+        }
+
         this.colorPalette = { ...this.tempColorPalette };  // Apply changes
         this.closeColorPopUp();
         this.annotationLayer.clear();
