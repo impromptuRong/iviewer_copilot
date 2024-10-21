@@ -15,7 +15,7 @@ from sqlalchemy import select, delete, update, insert
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from fastapi.middleware.cors import CORSMiddleware
 
-from utils.db import Base, Annotation
+from utils.db import Base, Annotation, Cache
 
 
 app = FastAPI()
@@ -334,7 +334,7 @@ async def delete_data(image_id: str, item_id: int, session=Depends(get_session),
         msg = f"Failed to acquire `db_lock:{image_id}`. Processed by another process/thread."
         return Response(content=msg, status_code=409, media_type="text/plain")
 
-        
+
 @app.get("/annotation/read")
 async def read_data(image_id: str, item_id: int, session=Depends(get_session)):
     try:
@@ -573,6 +573,49 @@ async def search_data_stream(websocket: WebSocket, image_id: str):
     except WebSocketDisconnect:
         if task and not task.done():
             task.cancel()
+
+
+@app.get("/cache/registry")
+async def get_all_registry(image_id: str, session=Depends(get_session)):
+    try:
+        print(f"Find all registry from `{image_id}.db/cache`")
+        stmt = select(Cache.registry).distinct()
+        result = await session.execute(stmt)
+        if not result:
+            raise HTTPException(status_code=404, detail="Registries not found. ")
+
+        registry = [obj for obj in result.scalars()]
+
+        return registry
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to get all registries: {str(e)}")
+
+
+@app.delete("/cache/delete")
+async def clean_cache(image_id: str, registry: int, session=Depends(get_session), client=Depends(get_redis)):
+    lock = client.lock(f"db_lock:{image_id}")
+    acquired = await lock.acquire(blocking=True, blocking_timeout=3)
+    print(f"(Delete) db_lock:{image_id} ({lock}) acquired={acquired}.")
+
+    if acquired:
+        try:
+            print(f"(Delete) db_lock:{image_id} ({lock}) is locked.")
+            stmt = delete(Cache).where(Cache.registry == registry)  # .returning(Cache)
+            await session.execute(stmt)
+            await session.commit()
+            # obj = result.scalar().to_dict()
+            msg = f"Deleted registry={registry} in `{image_id}/cache` successfully. "
+            return Response(content=msg, status_code=200, media_type="text/plain")
+        except Exception as e:
+            msg = f"Failed to delete registry={registry} in `{image_id}/cache`. {str(e)}"
+            # raise HTTPException(status_code=400, detail=str(e))
+            return Response(content=msg, status_code=500, media_type="text/plain")
+        finally:
+            await lock.release()
+            print(f"(Delete) db_lock:{image_id} ({lock}) is released.")
+    else:
+        msg = f"Failed to acquire `db_lock:{image_id}`. Processed by another process/thread."
+        return Response(content=msg, status_code=409, media_type="text/plain")
 
 
 if __name__ == "__main__":

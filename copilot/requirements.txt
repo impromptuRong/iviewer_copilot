@@ -3,9 +3,10 @@ aiosqlite
 asyncio
 async_lru
 fastapi
-gradio
+gradio<5.0  # > 5.0 changed layout
 gunicorn
 imagecodecs
+matplotlib
 ollama
 openai
 opencv-python-headless

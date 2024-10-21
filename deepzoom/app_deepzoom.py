@@ -72,8 +72,8 @@ redis_host = os.environ.get('REDIS_HOST', 'localhost')
 redis_port = os.environ.get('REDIS_PORT', 6379)
 setting_cache = Cache(
     Cache.REDIS,
-    endpoint=redis_host,  # Replace with your Redis server address
-    port=redis_port,            # Replace with your Redis server port
+    endpoint=redis_host,
+    port=redis_port,
     namespace='setting',
     serializer=PickleSerializer(),
     timeout=5,           # Set the cache timeout (in seconds)
@@ -84,7 +84,12 @@ setting_cache = Cache(
 async def _get_slide(slide_path):
     try:
         print(f"Excute remote slide: {slide_path}")
-        slide = SimpleTiff(slide_path)
+        if slide_path.startswith('http'):
+            print(f"Use SimpleTiff")
+            slide = SimpleTiff(slide_path)
+        else:
+            print(f"Use TiffFile")
+            slide = TiffFile(slide_path)
         return slide
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Failed to load slide from {slide_path}: {str(e)}")
@@ -97,7 +102,9 @@ async def _get_generator(key):
         osr = await _get_slide(settings.file)
 
         slide = Slide(osr)
-        slide.attach_reader(osr, engine='simpletiff')
+        engine = 'simpletiff' if settings.file.startswith('http') else 'tifffile'
+        print(f"use engine={engine}")
+        slide.attach_reader(osr, engine=engine)
 
         generator = DeepZoomGenerator(
             slide, 
