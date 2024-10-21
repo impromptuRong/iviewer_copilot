@@ -13,29 +13,15 @@ function generateButton(viewer) {
     return button
 }
 
-function parseDatabaseAnnotation(ann, colorPalette) {
-    let color = colorPalette.getColor(ann.label);
-
+function parseShape(ann) {
     // poly_x and poly_y are strings of comma-separated floats
     let polyX = ann.poly_x.split(',');
     let polyY = ann.poly_y.split(',');
-
     if (ann.poly_x.length === 0 || ann.poly_y.length === 0) { // box and point
         let [x0, y0] = [parseFloat(ann.x0), parseFloat(ann.y0)];
         let [x1, y1] = [parseFloat(ann.x1), parseFloat(ann.y1)];
         if (x0 == x1 && y0 == y1) { // point
             return {
-                id: ann.id,
-                label: ann.label,
-                description: ann.description,
-                annotator: ann.annotator,
-                project_id: ann.project_id,
-                group_id: ann.group_id,
-                created_at: ann.created_at,
-                fill: color['face'],
-                stroke: color['border'],
-                strokeWidth: 2,
-                draggable: false,
                 shape: "point",
                 x: x0,
                 y: y0,
@@ -45,17 +31,6 @@ function parseDatabaseAnnotation(ann, colorPalette) {
             };
         } else { // box
             return {
-                id: ann.id,
-                label: ann.label,
-                description: ann.description,
-                annotator: ann.annotator,
-                project_id: ann.project_id,
-                group_id: ann.group_id,
-                created_at: ann.created_at,
-                fill: color['face'],
-                stroke: color['border'],
-                strokeWidth: 2,
-                draggable: false,
                 shape: "rect",
                 x: parseFloat(ann.x0),
                 y: parseFloat(ann.y0),
@@ -66,17 +41,6 @@ function parseDatabaseAnnotation(ann, colorPalette) {
     } else if (polyX.length === 1 || polyY.length === 1) { // Ellipse and circle
         let itemShape = parseFloat(polyX[0]) === parseFloat(polyY[0]) ? "circle" : "ellipse";
         return {
-            id: ann.id,
-            label: ann.label,
-            description: ann.description,
-            annotator: ann.annotator,
-            project_id: ann.project_id,
-            group_id: ann.group_id,
-            created_at: ann.created_at,
-            fill: color['face'],
-            stroke: color['border'],
-            strokeWidth: 2,
-            draggable: false,
             shape: itemShape,
             x: parseFloat(ann.xc),
             y: parseFloat(ann.yc),
@@ -90,17 +54,6 @@ function parseDatabaseAnnotation(ann, colorPalette) {
             points.push(parseFloat(polyY[i]));
         }
         return {
-            id: ann.id,
-            label: ann.label,
-            description: ann.description,
-            annotator: ann.annotator,
-            project_id: ann.project_id,
-            group_id: ann.group_id,
-            created_at: ann.created_at,
-            fill: color['face'],
-            stroke: color['border'],
-            strokeWidth: 2,
-            draggable: false,
             shape: "polygon",
             points: points,
             closed: true,
@@ -108,27 +61,33 @@ function parseDatabaseAnnotation(ann, colorPalette) {
     }
 }
 
-function konva2w3c(selectedShape) {
-    // konva shapes: rect, ellipse, circle, polygon
-    const { id, label, annotator, shape, description, created_at} = selectedShape.attrs;
-    const bbox = { x0: selectedShape.ann.x0, y0: selectedShape.ann.y0, x1: selectedShape.ann.x1, y1: selectedShape.ann.y1 };
+function parseDatabaseAnnotation(ann, colorPalette) {
+    let item = parseShape(ann);
+    let color = colorPalette.getColor(ann.label);
 
+    return {
+        id: ann.id,
+        label: ann.label,
+        description: ann.description,
+        annotator: ann.annotator,
+        project_id: ann.project_id,
+        group_id: ann.group_id,
+        created_at: ann.created_at,
+        fill: color['face'],
+        stroke: color['border'],
+        strokeWidth: 2,
+        draggable: false,
+        ...item,
+    }
+}
+
+function buildSVG(item) {
+    // konva shapes: rect, ellipse, circle, polygon
+    console.log("buildSVG", item);
     let value, type;
     let rectflag = false;
-    let labelArray = label.split(',');
-    let taggingResult = [];
-    if (labelArray.length > 0 && labelArray[0] !== "") {
-        for (let item of labelArray) {
-            taggingResult.push({
-                "type": "TextualBody",
-                "value": item.trim(),
-                "purpose": "tagging"
-            });
-        }
-    }
-    if (shape === "polygon") {
-        const {points} = selectedShape.attrs;
-        const pointsString = points.reduce((acc, val, index, array) => {
+    if (item.shape === "polygon") {
+        const pointsString = item.points.reduce((acc, val, index, array) => {
             if (index % 2 === 0) {
                 acc += val + ",";
             } else {
@@ -141,27 +100,45 @@ function konva2w3c(selectedShape) {
  
             return acc;
         }, "");
- 
         value = `<svg><polygon points="${pointsString}"></polygon></svg>`;
         type = "SvgSelector";
-    } else if (shape === "ellipse") {
-        const {x, y, radiusX, radiusY} = selectedShape.attrs;
+    } else if (item.shape === "ellipse") {
         type = "SvgSelector";
-        value = `<svg><ellipse cx="${x}" cy="${y}" rx="${radiusX}" ry="${radiusY}"></ellipse></svg>`;
-    } else if (shape === "circle") {
-        const {x, y, radiusX, radiusY} = selectedShape.attrs;
+        value = `<svg><ellipse cx="${item.x}" cy="${item.y}" rx="${item.radiusX}" ry="${item.radiusY}"></ellipse></svg>`;
+    } else if (item.shape === "circle") {
         type = "SvgSelector";
-        value = `<svg><circle cx="${x}" cy="${y}" r="${radiusX}"></circle></svg>`;
-    } else if (shape === "point") {
+        value = `<svg><circle cx="${item.x}" cy="${item.y}" r="${item.radiusX}"></circle></svg>`;
+    } else if (item.shape === "point") {
         rectflag = true;
-        const {x, y} = selectedShape.attrs;
         type = "FragmentSelector";
-        value = `xywh=pixel:${x},${y},0,0`;
+        value = `xywh=pixel:${item.x},${item.y},0,0`;
     } else {
         rectflag = true;
-        const {x, y, width, height} = selectedShape.attrs;
         type = "FragmentSelector";
-        value = `xywh=pixel:${x},${y},${width},${height}`;
+        value = `xywh=pixel:${item.x},${item.y},${item.width},${item.height}`;
+    }
+
+    return {
+        "type": type,
+        ...(rectflag ? {"conformsTo": "http://www.w3.org/TR/media-frags/"} : {}),
+        "value": value
+    }
+}
+
+function konva2w3c(selectedShape) {
+    const { id, label, annotator, description, created_at} = selectedShape.attrs;
+    // const bbox = { x0: selectedShape.ann.x0, y0: selectedShape.ann.y0, x1: selectedShape.ann.x1, y1: selectedShape.ann.y1 };
+
+    let labelArray = label.split(',');
+    let taggingResult = [];
+    if (labelArray.length > 0 && labelArray[0] !== "") {
+        for (let item of labelArray) {
+            taggingResult.push({
+                "type": "TextualBody",
+                "value": item.trim(),
+                "purpose": "tagging"
+            });
+        }
     }
 
     const w3cAnnotation = [
@@ -196,11 +173,7 @@ function konva2w3c(selectedShape) {
                 },
             ],
             "target": {
-                "selector": {
-                    "type": type,
-                    ...(rectflag ? {"conformsTo": "http://www.w3.org/TR/media-frags/"} : {}),
-                    "value": value
-                }
+                "selector": buildSVG(selectedShape.attrs),
             },
             "id": `#${id}`
         }
@@ -209,57 +182,15 @@ function konva2w3c(selectedShape) {
     return w3cAnnotation;
 }
 
-function w3c2konva(w3cAnnotation) {
-    // Extract data from the provided W3C annotation format
-    const svgSelector = w3cAnnotation ? w3cAnnotation.target.selector.value : null;
-    let description = "";
-    let label = "";
-    var labels = [];
-    w3cAnnotation.body.find(function(b) {
-        if (b.purpose == 'tagging') {
-            labels.push(b.value);
-        }
-    })
-    label = labels.join(',');
-    var currentDes = w3cAnnotation ? w3cAnnotation.body.filter(function(b) {
-        return b.purpose == 'commenting';
-    }) : [];
-    var currentReplies = w3cAnnotation ? w3cAnnotation.body.filter(function(b) {
-        return b.purpose == 'replying';
-    }) : [];
-
-    description = '';
-    console.log("length", currentDes.length, currentReplies.length);
-    if (currentDes && currentDes.length > 0) {
-        description += currentDes.map(function(item) {
-            console.log(item.value)
-            return item.value;
-        }).join('\n');
-    }
-    if (currentDes.length > 0 && currentReplies.length > 0) {
-        description += '\n';
-    }
-    if (currentReplies.length > 0) {
-        description += currentReplies.map(function(reply) {
-            return reply.value;
-        }).join('\n');
-    }
-
-    // if(w3cAnnotation.body.length>0){
-    //     description = w3cAnnotation.body[0].value;
-    // }
-    console.log("selector", svgSelector);
-    // svg shapes: rect, ellipse, circle, polygon, path
-    let convertedObject = {};
-
+// Extract data from the provided W3C annotation format
+function extractSelectorInfo(svgSelector) {
     // Parse the SVG selector to extract polygon points
     if (svgSelector.startsWith('<svg><polygon')) {
         const match = /points="([^"]+)"/.exec(svgSelector);
         const pointsString = match ? match[1] : '';
-        console.log("svg", pointsString);
         // Split the points string and convert to array
         const pointPairs = pointsString.split(' ').flatMap(pair => pair.split(',').map(Number));
-        console.log("pairs", pointPairs);
+
         let xArray = [];
         let yArray = [];
         // Extract x and y arrays without rounding
@@ -271,9 +202,7 @@ function w3c2konva(w3cAnnotation) {
             }
         }
         // const xArray = pointPairs.map(point => parseFloat(point[0]));
-        console.log("x",xArray)
         // const yArray = pointPairs.map(point => parseFloat(point[1]));
-        console.log("y",yArray)
         // Find minX, maxX, minY, maxY as integers
         const minX = Math.floor(Math.min(...xArray));
         const maxX = Math.ceil(Math.max(...xArray));
@@ -283,21 +212,16 @@ function w3c2konva(w3cAnnotation) {
         // Create poly_x and poly_y strings with two decimal places
         const polyX = xArray.map(x => (parseFloat(x).toFixed(2)).toString()).join(',');
         const polyY = yArray.map(x => (parseFloat(x).toFixed(2)).toString()).join(',');
-        // console.log("polyx", polyX)
-        // console.log("polyx", polyY)
+
         // Create an object with the extracted data
-        convertedObject = {
-            // id: id,
+        return {
             poly_x: polyX,
             poly_y: polyY,
-            description: description,
             x0: minX,
             y0: minY,
             x1: maxX,
             y1: maxY,
-            label: label,
-            // annotator: userid.toString(),
-            shape:"polygon"
+            shape: "polygon"
         };
     } else if (svgSelector.startsWith('<svg><ellipse')) {
         const ellipseMatch = svgSelector.match(/<ellipse cx="(\d+(\.\d+)?)".* cy="(\d+(\.\d+)?)".* rx="(\d+(\.\d+)?)".* ry="(\d+(\.\d+)?)".*<\/ellipse>/);
@@ -308,9 +232,6 @@ function w3c2konva(w3cAnnotation) {
             const parsedRX = parseFloat(rx);
             const parsedRY = parseFloat(ry);
             return {
-                label: label,
-                // annotator: userid.toString() ,
-                description: description,
                 poly_x: parsedRX.toFixed(2),
                 poly_y: parsedRY.toFixed(2),
                 x0: (parsedXC - parsedRX).toFixed(2),
@@ -331,9 +252,6 @@ function w3c2konva(w3cAnnotation) {
             const parsedYC = parseFloat(cy);
             const parsedR = parseFloat(r);
             return {
-                label: label,
-                // annotator: userid.toString(),
-                description: description,
                 poly_x: parseFloat(r).toFixed(2),
                 poly_y: parseFloat(r).toFixed(2),
                 x0: (parsedXC - parsedR).toFixed(2),
@@ -349,16 +267,12 @@ function w3c2konva(w3cAnnotation) {
         const rectMatch = svgSelector.match(/xywh=pixel:(\d+(\.\d+)?),(\d+(\.\d+)?),(\d+(\.\d+)?),(\d+(\.\d+)?)/);
         if (rectMatch) {
             const [, x, , y, , width, , height] = rectMatch;
-              // Parse values to numbers
             const parsedX = parseFloat(x);
             const parsedY = parseFloat(y);
             const parsedWidth = parseFloat(width);
             const parsedHeight = parseFloat(height);
             if (parsedWidth == 0 && parsedHeight == 0) {
                 return {
-                    label: label,
-                    // annotator: userid.toString(),
-                    description: description,
                     poly_x: "",
                     poly_y: "",
                     x0: parsedX.toFixed(2),
@@ -369,9 +283,6 @@ function w3c2konva(w3cAnnotation) {
                 };
             } else {
                 return {
-                    label: label,
-                    // annotator: userid.toString(),
-                    description: description,
                     poly_x: "",
                     poly_y: "",
                     x0: parsedX.toFixed(2),
@@ -404,9 +315,6 @@ function w3c2konva(w3cAnnotation) {
             const maxY = Math.ceil(Math.max(...polyY));
 
             return {
-                label: label,
-                // annotator: userid.toString(),
-                description: description,
                 poly_x: polyX.join(','),
                 poly_y: polyY.join(','),
                 x0: minX,
@@ -416,9 +324,77 @@ function w3c2konva(w3cAnnotation) {
                 shape: "freehand"
             };
         }
+    } else {
+        return {};
+    }
+}
+
+function extractAnnotationInfo(w3cAnnotation) {
+    let description = "";
+    var labels = [];
+    w3cAnnotation.body.find(function(b) {
+        if (b.purpose == 'tagging') {
+            labels.push(b.value);
+        }
+    })
+
+    var currentDes = w3cAnnotation ? w3cAnnotation.body.filter(function(b) {
+        return b.purpose == 'commenting';
+    }) : [];
+    var currentReplies = w3cAnnotation ? w3cAnnotation.body.filter(function(b) {
+        return b.purpose == 'replying';
+    }) : [];
+
+    // console.log("length", currentDes.length, currentReplies.length);
+    if (currentDes && currentDes.length > 0) {
+        description += currentDes.map(function(item) {
+            // console.log(item.value)
+            return item.value;
+        }).join('\n');
+    }
+    if (currentDes.length > 0 && currentReplies.length > 0) {
+        description += '\n';
+    }
+    if (currentReplies.length > 0) {
+        description += currentReplies.map(function(reply) {
+            return reply.value;
+        }).join('\n');
     }
 
-    return convertedObject;
+    // if(w3cAnnotation.body.length>0){
+    //     description = w3cAnnotation.body[0].value;
+    // }
+
+    return {'label': labels.join(','), 'description': description}
+}
+
+function w3c2konva(annotation) {
+    let svgSelector = annotation ? annotation.target.selector.value : null;
+    let query = extractSelectorInfo(svgSelector);  // JSON.stringify(annotation)
+    let annInfo = extractAnnotationInfo(annotation);
+    query['label'] = annInfo.label;
+    query['description'] = annInfo.description;
+
+    return query;
+}
+
+function refineSelection(api, query) {
+    console.log("refineSelection", api, query);
+    return fetch(api, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(query)
+    }).then(response => {
+        if (!response.ok) {
+            throw new Error('Network response was not ok');
+        }
+        return response.json();
+    }).catch(error => {
+        console.error('There was a problem with the fetch operation:', error);
+        throw error;
+    });
 }
 
 function createAnnotation(api, query) {

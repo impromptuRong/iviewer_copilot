@@ -51,8 +51,8 @@ class ColorPalette {
     static instanceCount = 0;
     static paletteInstances = {};
 
-    constructor(annotationLayer, colorPalette = {}, defaultColor = '#E8E613') {
-        this.annotationLayer = annotationLayer;
+    constructor(container, colorPalette = {}, defaultColor = '#E8E613') {
+        this.annotationLayers = [];
         this.colorPalette = colorPalette;
         this.defaultColor = defaultColor;
         this.isDragging = false;
@@ -63,8 +63,19 @@ class ColorPalette {
         this.tempColorPalette = { ...colorPalette };  // Temporary storage for changes
         this.hideLabels = new Set();
 
+        // register annotationLayer and container
+        // use arrow, don't use function (this in function refer to container not instance)
+        container.onclick = () => {
+            this.openColorPopUp(container);  // 'this' refers to the ColorPalette instance
+        };
+        this.container = container;
+
         this.createColorPopUp();
         this.setupDragListeners();
+    }
+
+    addLayers(annotationLayers) {
+        this.annotationLayers.push(...annotationLayers);
     }
 
     getColor(label, defaultColor=null) {
@@ -221,8 +232,10 @@ class ColorPalette {
 
         this.colorPalette = { ...this.tempColorPalette };  // Apply changes
         this.closeColorPopUp();
-        this.annotationLayer.clear();
-        this.annotationLayer.draw();
+        this.annotationLayers.forEach((layer) => {
+            layer.clear();
+            layer.draw();
+        });
     }
 
     cancelChanges() {
@@ -298,19 +311,22 @@ class IViewerAnnotation {
             let capacity = cfg?.capacity || null;
             this.addLayer(id=id, capacity=capacity);
         });
-        
+
         // Add a colorPalette to Konva if given.
-        let colorPaletteCfgs = this.cfs?.colorPalette || {'colors': {}};
-        let colorPalette = new ColorPalette(
-            this, 
-            colorPaletteCfgs?.colors || {},
-            colorPaletteCfgs?.default || '#E8E613',
-        );
-        let colorButton = colorPaletteCfgs?.container || generateButton(viewer);
-        colorButton.onclick = function() {
-            colorPalette.openColorPopUp(colorButton);
-        };
-        this.colorPalette = colorPalette;
+        let colorPalette = this.cfs?.colorPalette || {'colors': {}};
+        if (colorPalette instanceof ColorPalette) {
+            this.colorPalette = colorPalette;
+            this.colorPalette.addLayers([this]);
+        } else {
+            let colorPaletteCfgs = colorPalette;
+            let colorButton = colorPaletteCfgs?.container || generateButton(viewer);
+            this.colorPalette = new ColorPalette(
+                colorButton,
+                colorPaletteCfgs?.colors || {},
+                colorPaletteCfgs?.default || '#E8E613',
+            );
+            this.colorPalette.addLayers([this]);
+        }
         
         // Add Annotorious Layer
         let widgets = this.cfs?.widgets || [];
@@ -475,9 +491,8 @@ class IViewerAnnotation {
 //         console.log("Incoming Annotators: ", newAnnotators);
 
         // Remove annotators
-        // const deletedIds = this.activeAnnotators.difference(newAnnotators);
         const deletedIds = new Set([...this.activeAnnotators].filter(x => !newAnnotators.has(x)));
-        console.log("deletedids", deletedIds)
+        console.log("deletedids", deletedIds);
         if (deletedIds.size > 0) {
 //             console.log("Delete Annotators: ", deletedIds);
             let layerQueue = this.getLayerQueue();
@@ -490,9 +505,8 @@ class IViewerAnnotation {
         }
 
         // Add annotators
-        // const addIds s= newAnnotators.difference(this.activeAnnotators);
         const addIds = new Set([...newAnnotators].filter(x => !this.activeAnnotators.has(x)));
-        console.log("addIds", addIds)
+        console.log("addIds", addIds);
         if (addIds.size > 0) {
 //             console.log("Add Annotators: ", addIds);
             this.render({'annotator': Array.from(addIds)});
@@ -566,7 +580,7 @@ class IViewerAnnotation {
                 }
             }
         });
-        
+
         this._annotoriousLayer.on('cancelSelected', annotation => {
             this._modifingNode?.show();
             this._annotoriousLayer.removeAnnotation(annotation);
@@ -579,7 +593,6 @@ class IViewerAnnotation {
             let query = w3c2konva(annotation);  // JSON.stringify(annotation)
             query['annotator'] = this.userId.toString();
             query['created_at'] = new Date().toISOString();
-            console.log(query['created_at']);
 //             console.log("Enter createAnnotation", query);
             this._annotoriousLayer.removeAnnotation(annotation);
             this._annotoriousLayer.cancelSelected();
@@ -602,13 +615,12 @@ class IViewerAnnotation {
         });
 
         this._annotoriousLayer.on('updateAnnotation', (annotation, previous) => {
-            let item = this._modifingNode;
-//             let query = w3c2konva(annotation, this.userId);
             let query = w3c2konva(annotation);
             query['annotator'] = this.userId.toString();
             query['created_at'] = new Date().toISOString();
 //             console.log("Enter updateAnnotation", item.ann.id, item, query);
 
+            let item = this._modifingNode;
             let api = this.APIs.annoUpdateAPI + item.ann.id;
             updateAnnotation(api, query).then(ann => {
                 item = this.updateKonvaItem(ann, item);
@@ -620,7 +632,6 @@ class IViewerAnnotation {
                         filteredActiveAnnotators.push(item);
                     }
                   });
-                  console.log()
                 drawNUpdateDatatable(this.APIs.annoSearchAPI, {"annotator": filteredActiveAnnotators}, this.colorPalette);
             });
             this._annotoriousLayer.removeAnnotation(annotation);
@@ -632,7 +643,7 @@ class IViewerAnnotation {
             let item = this._modifingNode;
             let api = this.APIs.annoDeleteAPI + item.ann.id;
             deleteAnnotation(api).then(resp => {
-                console.log(resp);
+                // console.log(resp);
                 this.getLayerQueue().remove(item);
                 const filteredActiveAnnotators = [];
                 this.activeAnnotators.forEach(item => {
@@ -672,7 +683,7 @@ class IViewerAnnotation {
         for (let key in this.layerQueues) {
             this.layerQueues[key].destroyChildren();
         }
-        this._konvaStage.clearAll();
+        this._konvaStage.clear();
     }
 
     resize() {

@@ -7,8 +7,10 @@
     <link rel="stylesheet" href="../static/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@recogito/annotorious@latest/dist/annotorious.min.css">
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css"/>
 
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/konva/8.2.0/konva.min.js"></script>
     <script type="text/javascript" src="../static/openseadragon/openseadragon.min.js"></script>
     <script type="text/javascript" src="../static/OpenseadragonAnnotorious/openseadragon-annotorious.min.js"></script>
@@ -23,7 +25,7 @@
     <script type="text/javascript" src="../static/utils.js"></script>
 
     <script>
-        const imgIdMap = {"9388.svs": "test",}
+        const imgIdMap = {"9388.svs": "test",};
         const mpp = 0.25;
         const imgName = "9388.svs";
         const slideFolder = "abc";
@@ -31,7 +33,7 @@
         const userId = "1";
         const userName = "user";
         const userIdNameMap = {"1": "user", "yolov8-lung": "yolov8-lung",};
-        const colorPalette = {
+        const globalColorCodes = {
             'bg': "#ffffff",
             'tumor_nuclei': "#00ff00",
             'stromal_nuclei': "#ff0000",
@@ -42,7 +44,7 @@
             'other_nuclei': "#646464",
         };
 
-        const server = 'localhost'
+        const server = '129.112.7.194'
         const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=slide`;
         const paramAPI = `http://${server}:10010/proxy/params?image_id=${imgId}&registry=slide`;
         const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=yolov8-lung`;
@@ -123,7 +125,7 @@
 
 <script type="text/javascript">
 $(function() {
-    let maxZoomPixelRatio = mpp ? mpp / 0.25 * 1.1 : 1.1;
+    let maxZoomPixelRatio = mpp ? mpp / 0.25 * 2 : 2;
     var viewer = new OpenSeadragon({
         id: "view",
         tileSources: displayAPI, 
@@ -165,27 +167,29 @@ $(function() {
         }
     });
 
+    // Create a ColorPalette
+    var colorPalette = new ColorPalette(
+        document.getElementById("showColor"),
+        globalColorCodes, '#E8E613',
+    );
+
     // Add a IViewerAnnotation Layer (Konva + Annotorious)
     var annotationLayer = new IViewerAnnotation(viewer, {
-        'layers': [{'capacity': 4096}],
-        'widgets': [
+        layers: [{capacity: 4096}],
+        widgets: [
             'COMMENT',
             {
                 widget: 'TAG', 
-                vocabulary: Object.values(colorPalette),
+                vocabulary: colorPalette.labels(),
             },
             aiChatBox,
             AnnotatorWidget,
         ],
-        'drawingTools': {
+        drawingTools: {
             tools: ['point', 'rect', 'polygon', 'circle', 'ellipse', 'freehand'],
             container: document.getElementById('manual-toolbar'), 
         },
-        'colorPalette': {
-            colors: colorPalette,
-            container: document.getElementById("showColor"),
-            default: '#E8E613',
-        },
+        colorPalette: colorPalette,
     });
 
     annotationLayer.buildConnections(createDB, getAnnotator, getLabels, insert, read, update, deleteanno, search, stream, count);
