@@ -8,14 +8,10 @@ import numpy as np
 import torch.nn.functional as F
 import torchvision.transforms as T
 
-from .utils import rgba2rgb, masks2segments, process_mask, non_max_suppression
-
-YOLOv8_PRETRAINED_MODEL_ARCHIVE_LIST = [
-    "yolov8-lung-nuclei",
-]
+from .utils import masks2segments, process_mask, approx_poly_epsilon, non_max_suppression
+from .utils import export_detections_to_table, map_coords
 
 proto_scale_factor = 2.
-
 
 
 class Yolov8SegmentationTorchscript:
@@ -53,7 +49,7 @@ class Yolov8SegmentationTorchscript:
         if isinstance(size, numbers.Number):
             size = [int(size), int(size)]
         assert len(size) == 2, "Please provide only two dimensions (h, w) for size."
-        self.input_size = [size[0], size[1]]
+        self.input_size = (size[0], size[1])
 
         return self
 
@@ -62,15 +58,21 @@ class Yolov8SegmentationTorchscript:
 
         return self
 
-    def __call__(self, images, patch_infos=None, nms_params={}):
+    def __call__(self, images, nms_params={}, preprocess=True):
         with torch.inference_mode():
             s0 = time.time()
-            inputs, image_sizes = self.preprocess(images)
+            if preprocess:
+                inputs, image_sizes = self.preprocess(images)
+            else:
+                # no process: images = np.float(batch, 3, 640, 640)
+                # images = np.stack([np.array(_) for _ in pil_images]).transpose(0, 3, 1, 2) / 255
+                assert images.shape[1:] == (3,) + self.input_size, f"Inputs require preprocess."
+                inputs, image_sizes = images, None
             s1 = time.time()
             preds = self.predict(inputs)
             s2 = time.time()
             results = self.postprocess(
-                preds, patch_infos, image_sizes, nms_params,
+                preds, image_sizes, nms_params,
             )
             s3 = time.time()
             print(f"preprocess: {s1-s0}, inference: {s2-s1}, postprocess: {s3-s2}")
@@ -82,7 +84,7 @@ class Yolov8SegmentationTorchscript:
 
         inputs, image_sizes = [], []
         for img in images:
-            img = rgba2rgb(img)
+            img = np.array(img)
             h_ori, w_ori = img.shape[0], img.shape[1]
             image_sizes.append([h_ori, w_ori])
             if h != h_ori or w != w_ori:
@@ -90,7 +92,7 @@ class Yolov8SegmentationTorchscript:
             img = T.ToTensor()(img)
             inputs.append(img)
 
-        return torch.stack(inputs), torch.tensor(image_sizes)
+        return torch.stack(inputs), image_sizes
 
     def predict(self, inputs):
         inputs = inputs.to(self.device, self.model_dtype, non_blocking=True)
@@ -99,7 +101,7 @@ class Yolov8SegmentationTorchscript:
 
         return preds
 
-    def postprocess(self, preds, patch_infos=None, image_sizes=None, nms_params={}):
+    def postprocess(self, preds, image_sizes=None, nms_params={}):
         if isinstance(preds, tuple):
             preds, protos = preds
         else:
@@ -116,15 +118,18 @@ class Yolov8SegmentationTorchscript:
         h, w = self.input_size
 
         res = []
-        for pred, proto, info, (h_ori, w_ori) in zip(preds, protos, patch_infos, image_sizes):
-            o = {'boxes': pred[:, :4], 'labels': pred[:, 5] + 1, 'scores': pred[:, 6],}
+        for pred, proto, (h_ori, w_ori) in zip(preds, protos, image_sizes):
+            o = {'boxes': pred[:, :4], 'labels': pred[:, 5] + 1, 'scores': pred[:, 4],}
 
             if len(pred):
                 if proto is not None:
                     masks = process_mask(proto, pred[:, 6:], pred[:, :4], [h, w])  # HWC
                     masks = F.interpolate(masks[None], scale_factor=proto_scale_factor, 
                                           mode='bilinear', align_corners=False)[0]  # CHW
-                    o['masks'] = masks2segments(masks.gt_(0.5), output_shape=[h_ori, w_ori])
+                    masks = masks2segments(masks.gt_(0.5), output_shape=[h_ori, w_ori], 
+                                           approx=lambda x: approx_poly_epsilon(x, factor=0.01)
+                                          )
+                    o['masks'] = masks
 
                 # max number of float16 is 65536, half will lead to inf for large image.
                 o['boxes'][:, [0, 2]] *= w_ori/w  # rescale to image size
@@ -133,20 +138,38 @@ class Yolov8SegmentationTorchscript:
                 o['labels'] = o['labels'].to(torch.int32).cpu()
                 o['scores'] = o['scores'].to(torch.float32).cpu()
 
-                # trim border objects, map to original coords
-                if info is not None:
-                    # info: [x0_s, y0_s, w_p(w_s), h_p(h_s), pad_w(x0_p), pad_h(y0_p)]
-                    x0_s, y0_s, w_p, h_p, x0_p, y0_p = info
-                    # assert x0_p == 64 and y0_p == 64 and w_s == w_p and h_s == h_p, f"{roi_slide}, {roi_patch}"
-                    x_c, y_c = o['boxes'][:,[0,2]].mean(1), o['boxes'][:,[1,3]].mean(1)
-                    keep = (x_c > x0_p) & (x_c < x0_p + w_p) & (y_c > y0_p) & (y_c < y0_p + h_p)
-                    o = {k: v[keep] for k, v in o.items()}
-
-                    o['boxes'][:, [0, 2]] += x0_s - x0_p
-                    o['boxes'][:, [1, 3]] += y0_s - y0_p
-                    for m in o.get('masks', []):
-                        m += [x0_s - x0_p, y0_s - y0_p]
-
             res.append(o)
 
         return res
+
+    def convert_results_to_annotations(self, output, patch_info, annotator=None, extra={}):
+        output = map_coords(output, patch_info)
+
+        ## save tables
+        st = time.time()
+        df = export_detections_to_table(
+            output, labels_text=self.configs.labels_text,
+            save_masks=True,
+        )
+        df['xc'] = (df['x0'] + df['x1']) / 2
+        df['yc'] = (df['y0'] + df['y1']) / 2
+        # df['box_area'] = (df['x1'] - df['x0']) * (df['y1'] - df['y0'])
+        df['description'] = df['label'].astype(str) + '; \nscore=' + df['score'].astype(str)
+        df = df.drop(columns=['score'])
+        df['annotator'] = annotator or self.configs.model_name
+        for k, v in extra.items():
+            df[k] = v
+        print(f"Export table: {time.time() - st}s.")
+
+        return df.to_dict(orient='records')
+
+    def test_run(self, image="http://images.cocodataset.org/val2017/000000039769.jpg"):
+        import requests
+        from PIL import Image
+
+        print(f"Testing service for {image}")
+        st = time.time()
+        image = Image.open(requests.get(image, stream=True).raw)
+        r = self.__call__([np.array(image)])
+
+        print(f"Test service: {len(r)} ({time.time()-st}s)")

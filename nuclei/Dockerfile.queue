@@ -2,9 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+COPY nuclei/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY nuclei/. .
 COPY utils ./utils
-RUN pip install --no-cache-dir -r requirements.txt
 
 # RUN export no_proxy="localhost"
 

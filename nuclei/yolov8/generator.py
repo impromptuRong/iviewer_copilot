@@ -22,8 +22,8 @@ class Yolov8Generator:
         # Find the best page for inference
         if osr.mpp is not None:
             # We prefer to use a high resolution layer. We strict at most 1.2 rescale.
-            best_page = osr.get_resize_level(osr.mpp/mpp, downsample_only=True, epsilon=0.2)
-            assert best_page == 0, f"Currently we shouldn't get best_page={best_page}."
+            best_page = osr.get_resize_level(mpp/osr.mpp, epsilon=0.2)
+            assert best_page == 0, f"Currently we shouldn't get best_page={best_page}. Observed slide.mpp={osr.mpp}. "
 
             # We force best_page is downsampled at 2**power
             power = np.log2(osr.level_downsamples[best_page])

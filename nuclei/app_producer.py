@@ -94,7 +94,7 @@ async def proxy_dzi(request: Request):
         print(f"*********************")
         print(f"proxy_dzi: {key} -> {setting}")
         print(f"check if {key} is in cache: {await setting_cache.get(key)}")
-        print(f"generator parameters: {generator.tile_size, generator.overlap}")
+        print(f"generator parameters: {generator.tile_size, generator.overlap, generator.run_mpp, generator.scale}")
         print(f"*********************")
 
         return Response(content=dzi, media_type="application/xml")
