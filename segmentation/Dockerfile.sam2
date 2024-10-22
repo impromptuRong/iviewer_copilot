@@ -1,0 +1,20 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY segmentation/requirements_worker.txt .
+RUN pip install --no-cache-dir -r requirements_worker.txt
+COPY segmentation/. .
+COPY utils ./utils
+
+# Download the ultralytics sam2 model
+RUN mkdir -p /app/ckpts/ultralytics
+# RUN wget -P /app/ckpts/ultralytics https://github.com/ultralytics/assets/releases/download/v8.2.0/sam2_b.pt
+RUN pip install wget
+RUN python -m wget -o /app/ckpts/ultralytics/sam2_b.pt https://github.com/ultralytics/assets/releases/download/v8.2.0/sam2_b.pt
+
+RUN pip install python-multipart
+
+# CMD ["celery", "-A", "app_worker.celery", "worker", "--loglevel=info", "-Q", "sam2-b"]
+RUN nohup celery -A app_worker.celery worker --loglevel=info -Q sam2-b > z.sam2_b.log &
+CMD ["python", "app_queue.py"]

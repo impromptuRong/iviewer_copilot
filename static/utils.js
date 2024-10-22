@@ -81,11 +81,12 @@ function parseDatabaseAnnotation(ann, colorPalette) {
     }
 }
 
-function buildSVG(item) {
+function buildSVGTarget(item) {
     // konva shapes: rect, ellipse, circle, polygon
-    console.log("buildSVG", item);
+    console.log("buildSVGTarget", item);
     let value, type;
     let rectflag = false;
+    let pointflag = false;
     if (item.shape === "polygon") {
         const pointsString = item.points.reduce((acc, val, index, array) => {
             if (index % 2 === 0) {
@@ -110,6 +111,7 @@ function buildSVG(item) {
         value = `<svg><circle cx="${item.x}" cy="${item.y}" r="${item.radiusX}"></circle></svg>`;
     } else if (item.shape === "point") {
         rectflag = true;
+        pointflag = true;
         type = "FragmentSelector";
         value = `xywh=pixel:${item.x},${item.y},0,0`;
     } else {
@@ -119,9 +121,12 @@ function buildSVG(item) {
     }
 
     return {
-        "type": type,
-        ...(rectflag ? {"conformsTo": "http://www.w3.org/TR/media-frags/"} : {}),
-        "value": value
+        "selector": {
+            "type": type,
+            ...(rectflag ? {"conformsTo": "http://www.w3.org/TR/media-frags/"} : {}),
+            "value": value
+        },
+        ...(pointflag ? {"renderedVia": {"name": "point"}} : {}),
     }
 }
 
@@ -172,9 +177,7 @@ function konva2w3c(selectedShape) {
                     "purpose": "showtime",
                 },
             ],
-            "target": {
-                "selector": buildSVG(selectedShape.attrs),
-            },
+            "target": buildSVGTarget(selectedShape.attrs),
             "id": `#${id}`
         }
     ];

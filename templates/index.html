@@ -6,7 +6,7 @@
 <head>
     <link rel="stylesheet" href="../static/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@recogito/annotorious@latest/dist/annotorious.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@recogito/annotorious@2.7.13/dist/annotorious.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css"/>
 
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
@@ -14,10 +14,10 @@
     <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/konva/8.2.0/konva.min.js"></script>
     <script type="text/javascript" src="../static/openseadragon/openseadragon.min.js"></script>
     <script type="text/javascript" src="../static/OpenseadragonAnnotorious/openseadragon-annotorious.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious@latest/dist/annotorious.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-better-polygon@latest/dist/annotorious-better-polygon.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-selector-pack@latest/dist/annotorious-selector-pack.min.js"></script>
-    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-toolbar@latest/dist/annotorious-toolbar.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious@2.7.13/dist/annotorious.min.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-better-polygon@0.2.0/dist/annotorious-better-polygon.js"></script>
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-selector-pack@0.6.1/dist/annotorious-selector-pack.min.js"></script>
+    <script type="text/javascript" src="../static/annotorious-toolbar.min.js"></script>
 
     <script type="text/javascript" src="../static/openseadragon-scalebar.js"></script>
     <script type="text/javascript" src="../static/openseadragon-iviewer-annotation.js"></script>
@@ -49,6 +49,7 @@
         const paramAPI = `http://${server}:10010/proxy/params?image_id=${imgId}&registry=slide`;
         const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=yolov8-lung`;
         const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=${slideFolder}%2F${imgName}&caption=gpt-4o&rag=gpt-4o`;
+        const segmentAPI = `http://${server}:10060/segment?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=sam2-b`;
 
         const database_url = `${server}:10020/annotation`;
         const createDB = `http://${database_url}/create?image_id=${imgId}`;
@@ -98,6 +99,10 @@
 
 <div id="toolbars">
     <div id="manual-toolbar" class="inner"></div>
+    <div id="auto-toolbar">
+        <button id="smartpoly" value="off" type="button">EnableSmart</button>
+        <input type="text" id="tag-input" size="20" placeholder="Enter smart label">
+    </div>
     <div id="model-toolbar">
         <button id="yolo" value="off" type="button">HDYolo</button>
         <button id="showColor" value="off" type="button">Show Label Colors</button>
@@ -187,7 +192,7 @@ $(function() {
         ],
         drawingTools: {
             tools: ['point', 'rect', 'polygon', 'circle', 'ellipse', 'freehand'],
-            container: document.getElementById('manual-toolbar'), 
+            container: document.getElementById('manual-toolbar'),
         },
         colorPalette: colorPalette,
     });
@@ -256,6 +261,17 @@ $(function() {
         console.log('Selected options: ', selectedAnnotators);
         document.getElementById('layers').style.display = 'none';
         annotationLayer.updateAnnotators(selectedAnnotators);
+    });
+
+    var smartPolyBtn = document.getElementById('smartpoly');
+    smartPolyBtn.addEventListener("click", function () {
+        if (smartPolyBtn.value == 'off') {
+            smartPolyBtn.value = 'on';
+            smartPolyBtn.textContent = 'DisableSmart';
+        } else {
+            smartPolyBtn.value = 'off';
+            smartPolyBtn.textContent = 'EnableSmart';
+        }
     });
 });
 </script>

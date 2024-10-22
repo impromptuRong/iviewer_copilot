@@ -134,3 +134,35 @@ services:
       - OLLAMA_PORT_MLLM=${OLLAMA_PORT_MLLM}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - NO_PROXY=localhost,127.0.0.1,annotation,${OLLAMA_HOST_LLM},${OLLAMA_HOST_MLLM},api.openai.com
+
+  segmentation:
+    image: iviewer-segment:latest
+    container_name: iviewer-segment
+    build:
+      context: .
+      dockerfile: ./segmentation/Dockerfile.queue
+    ports:
+      - "10050:9050"
+    networks:
+      - iviewer-network
+    volumes:
+      - ${SLIDES_DIR}:/app/abc
+    environment:
+      - SEGMENT_HOST=${SEGMENT_HOST}
+      - SEGMENT_PORT=${SEGMENT_PORT}
+      - NO_PROXY=localhost,127.0.0.1,${SEGMENT_HOST}
+
+  # sam2:
+  #   image: iviewer-sam2:latest
+  #   container_name: iviewer-sam2
+  #   build:
+  #     context: .
+  #     dockerfile: ./segmentation/Dockerfile.sam2
+  #   depends_on:
+  #     - redis
+  #     - segmentation
+  #   networks:
+  #     - iviewer-network
+  #   environment:
+  #     - REDIS_HOST=redis
+  #     - REDIS_PORT=6379

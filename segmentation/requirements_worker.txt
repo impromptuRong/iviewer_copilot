@@ -1,0 +1,11 @@
+celery
+fastapi
+imagecodecs
+matplotlib
+opencv-python-headless
+pandas
+redis
+requests
+ultralytics-nogui
+scikit-image
+uvicorn

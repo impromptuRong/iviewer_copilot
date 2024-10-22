@@ -1,0 +1,11 @@
+asyncio
+fastapi
+gunicorn
+imagecodecs
+matplotlib
+opencv-python-headless
+pandas
+redis
+requests
+scikit-image
+uvicorn

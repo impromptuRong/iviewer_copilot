@@ -540,7 +540,7 @@ class IViewerAnnotation {
 
     enableEditing(userId) {
         this.userId = userId;
-        
+
         // Enter modify mode: hide object and create an annotorious object
         this._viewer.addHandler("canvas-click", event => {
             let selected = this._annotoriousLayer.getSelected();
@@ -552,10 +552,10 @@ class IViewerAnnotation {
                     // Calculate the absolute differences
                     let xDiff = Math.abs(i.ann.x1 - i.ann.x0);
                     let yDiff = Math.abs(i.ann.y1 - i.ann.y0);
-                
+
                     // Calculate the product of absolute differences
                     let product = xDiff * yDiff;
-                
+
                     // Check if the current product is smaller than the smallest value found so far
                     if (product < smallestValue) {
                         smallestValue = product;
@@ -581,6 +581,36 @@ class IViewerAnnotation {
             }
         });
 
+        this._annotoriousLayer.on('createSelection', selection => {
+            let button = document.getElementById('smartpoly');
+            if (button.value === 'on') {
+                let svgSelector = selection ? selection.target.selector.value : null;
+                let query = extractSelectorInfo(svgSelector);
+
+                let api = segmentAPI;
+                refineSelection(api, query).then(ann => {
+                    let item = parseShape(ann);
+                    let newShape = buildSVGTarget(item);
+                    selection.target = newShape;
+
+                    let label = document.getElementById('tag-input').value;
+                    if (label.trim() != '') {
+                        selection.body.push({
+                            "type": "TextualBody",
+                            "purpose": "tagging",
+                            "value": label.trim(),
+                        });
+                    }
+
+                    this._annotoriousLayer.updateSelected(selection, true);
+                    const toolButton = document.querySelector('button.a9s-toolbar-btn.'.concat(query.shape));
+                    if (toolButton) {
+                        toolButton.click(); // Simulate a click to activate the drawing tool
+                    }
+                });
+            }
+        });
+
         this._annotoriousLayer.on('cancelSelected', annotation => {
             this._modifingNode?.show();
             this._annotoriousLayer.removeAnnotation(annotation);
@@ -593,7 +623,6 @@ class IViewerAnnotation {
             let query = w3c2konva(annotation);  // JSON.stringify(annotation)
             query['annotator'] = this.userId.toString();
             query['created_at'] = new Date().toISOString();
-//             console.log("Enter createAnnotation", query);
             this._annotoriousLayer.removeAnnotation(annotation);
             this._annotoriousLayer.cancelSelected();
             this._annotoriousLayer.clearAnnotations();
@@ -618,7 +647,6 @@ class IViewerAnnotation {
             let query = w3c2konva(annotation);
             query['annotator'] = this.userId.toString();
             query['created_at'] = new Date().toISOString();
-//             console.log("Enter updateAnnotation", item.ann.id, item, query);
 
             let item = this._modifingNode;
             let api = this.APIs.annoUpdateAPI + item.ann.id;
@@ -643,7 +671,6 @@ class IViewerAnnotation {
             let item = this._modifingNode;
             let api = this.APIs.annoDeleteAPI + item.ann.id;
             deleteAnnotation(api).then(resp => {
-                // console.log(resp);
                 this.getLayerQueue().remove(item);
                 const filteredActiveAnnotators = [];
                 this.activeAnnotators.forEach(item => {
