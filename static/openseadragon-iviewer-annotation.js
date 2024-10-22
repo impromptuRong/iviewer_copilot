@@ -62,6 +62,7 @@ class ColorPalette {
         ColorPalette.paletteInstances[this.instanceId] = this;
         this.tempColorPalette = { ...colorPalette };  // Temporary storage for changes
         this.hideLabels = new Set();
+        this.legend = document.getElementById("color-legend");
 
         // register annotationLayer and container
         // use arrow, don't use function (this in function refer to container not instance)
@@ -72,6 +73,10 @@ class ColorPalette {
 
         this.createColorPopUp();
         this.setupDragListeners();
+
+        for (const [label, color] of Object.entries(this.tempColorPalette)) {
+            this.createLegend(label, color); //also generate legend at same time
+        }
     }
 
     addLayers(annotationLayers) {
@@ -111,6 +116,7 @@ class ColorPalette {
         document.body.appendChild(colorPopUp);
         this.colorPopUp = colorPopUp;
         this.colorList = colorPopUp.querySelector('.colorList');
+        this.colorPopUp.style.display = "none";
     }
 
     openColorPopUp(button) {
@@ -133,10 +139,24 @@ class ColorPalette {
 
     generateColorPopUp() {
         this.colorList.innerHTML = ''; // Clear previous content
+        this.legend.innerHTML = '';
         for (const [label, color] of Object.entries(this.tempColorPalette)) {
             this.createLabelRow(label, color);
+            this.createLegend(label, color); //also generate legend at same time
         }
     }
+
+    createLegend(label, color) {
+        console.log("create legend")
+        const tagColor = document.createElement('div');
+        tagColor.classList.add('legend-box');
+        tagColor.style.backgroundColor = color;
+        const tag = document.createElement('span');
+        tag.textContent = label;
+        tag.classList.add('legend-text'); 
+        this.legend.appendChild(tagColor);
+        this.legend.appendChild(tag);
+     }
 
     createLabelRow(label, color) {
         const labelRow = document.createElement('div');
@@ -152,15 +172,12 @@ class ColorPalette {
         labelInput.classList.add('label-name');
 
         labelInput.oninput = () => {
-            const newLabel = labelInput.value.trim();
-            if (newLabel !== "" && newLabel !== label && this.tempColorPalette.hasOwnProperty(newLabel)) {
-                alert(`The label "${newLabel}" already exists. Please choose a different label.`);
-                labelInput.value = label; // Revert to the previous value
-            } else {
-                this.updateLabelInTempMap(label, newLabel, colorInput.value);
-                label = newLabel; // Update the label variable
-            }
-        };
+            let newLabel = labelInput.value.trim();
+            newLabel = newLabel.replace(/[-\s]/g, '_');
+            labelInput.value = newLabel;
+            this.updateLabelInTempMap(label, newLabel, colorInput.value);
+            label = newLabel;
+        }
 
         const colorInput = document.createElement('input');
         colorInput.type = 'color';
@@ -178,9 +195,10 @@ class ColorPalette {
     }
 
     addNewLabel() {
-        const newLabel = this.generateUniqueLabel("New Label");
+        const newLabel = this.generateUniqueLabel("New_Label");
         const newColor = this.defaultColor;
         this.tempColorPalette[newLabel] = newColor;
+        console.log("added new temp color", newLabel)
         this.createLabelRow(newLabel, newColor);
     }
 
@@ -188,7 +206,7 @@ class ColorPalette {
         let label = baseLabel;
         let counter = 1;
         while (this.tempColorPalette.hasOwnProperty(label)) {
-            label = `${baseLabel} ${counter++}`;
+            label = `${baseLabel}_${counter++}`;
         }
         return label;
     }
@@ -215,6 +233,25 @@ class ColorPalette {
     }
 
     confirmChanges() {
+        const labelInputs = document.querySelectorAll('.label-name');
+        const labelSet = new Set();
+        let hasDuplicate = false;
+
+         // Check for duplicate labels
+        labelInputs.forEach((input) => {
+            const label = input.value.trim();
+            if (labelSet.has(label)) {
+                alert(`The label "${label}" is duplicated. Please choose a different label.`);
+                hasDuplicate = true;
+                return;  // Abort
+            }
+            labelSet.add(label);  // Add to set if unique
+        });
+
+        if (hasDuplicate) {
+            return;  
+        }
+
         let deleteKeys = new Set(Object.keys(this.colorPalette).filter(x => !(x in this.tempColorPalette)));
         let addKeys = new Set(Object.keys(this.tempColorPalette).filter(x => !(x in this.colorPalette)));
 
@@ -235,7 +272,43 @@ class ColorPalette {
         this.annotationLayers.forEach((layer) => {
             layer.clear();
             layer.draw();
+        });        
+
+        // Send the colorPalette data to Laravel
+        const imageUUID = imgId; 
+        fetch('/save-color-palette', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                // 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+            },
+            body: JSON.stringify({
+                image_id: imageUUID,
+                color_palette: this.colorPalette,
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                console.log('Palette saved successfully');
+            }
+        }).catch(error => {
+            console.error('Error saving palette:', error);
+        })
+        .finally(() => {
+            // Update the legend regardless of success or failure
+            this.legend.innerHTML = '';
+            for (const [label, color] of Object.entries(this.tempColorPalette)) {
+                this.createLegend(label, color); // generate the legend at the same time
+            }
         });
+
+        //update the legend
+        this.legend.innerHTML = '';
+        for (const [label, color] of Object.entries(this.tempColorPalette)) {
+            this.createLegend(label, color); //also generate legend at same time
+        }
     }
 
     cancelChanges() {
@@ -583,7 +656,7 @@ class IViewerAnnotation {
 
         this._annotoriousLayer.on('createSelection', selection => {
             let button = document.getElementById('smartpoly');
-            if (button.value === 'on') {
+            if (button && button.value === 'on') {
                 let svgSelector = selection ? selection.target.selector.value : null;
                 let query = extractSelectorInfo(svgSelector);
 

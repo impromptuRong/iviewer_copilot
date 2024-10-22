@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@recogito/annotorious@2.7.13/dist/annotorious.min.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/jquery.dataTables.min.css"/>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" integrity="sha384-xOolHFLEh07PJGoPkLv1IbcEPTNtaed2xpHsD9ESMhqIYd0nLMwNLD69Npy4HI+N" crossorigin="anonymous">
 
     <script type="text/javascript" src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <script type="text/javascript" src="https://cdn.datatables.net/1.10.24/js/jquery.dataTables.min.js"></script>
@@ -18,6 +19,7 @@
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-better-polygon@0.2.0/dist/annotorious-better-polygon.js"></script>
     <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@recogito/annotorious-selector-pack@0.6.1/dist/annotorious-selector-pack.min.js"></script>
     <script type="text/javascript" src="../static/annotorious-toolbar.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-Fy6S3B9q64WdZWQUiU+q4/2Lc9npb8tCaSX9FK7E8HnRr0Jz8D6OP9dO5Vg3Q9ct" crossorigin="anonymous"></script>
 
     <script type="text/javascript" src="../static/openseadragon-scalebar.js"></script>
     <script type="text/javascript" src="../static/openseadragon-iviewer-annotation.js"></script>
@@ -32,7 +34,7 @@
         const imgId = imgIdMap[imgName];
         const userId = "1";
         const userName = "user";
-        const userIdNameMap = {"1": "user", "yolov8-lung": "yolov8-lung",};
+        const userIdNameMap = {"1": "user", "yolov8-lung": "yolov8-lung", "yolov8-colon": "yolov8-colon",};
         const globalColorCodes = {
             'bg': "#ffffff",
             'tumor_nuclei': "#00ff00",
@@ -44,24 +46,27 @@
             'other_nuclei': "#646464",
         };
 
-        const server = '129.112.7.194'
+        const server = 'localhost'
         const displayAPI = `http://${server}:10010/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=slide`;
         const paramAPI = `http://${server}:10010/proxy/params?image_id=${imgId}&registry=slide`;
         const yoloAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=yolov8-lung`;
+        const yoloColonAPI = `http://${server}:10030/proxy/dummy.dzi?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=yolov8-colon`;
         const chatAPI = `http://${server}:10040/copilot?image_id=${imgId}&file=${slideFolder}%2F${imgName}&caption=gpt-4o&rag=gpt-4o`;
         const segmentAPI = `http://${server}:10060/segment?image_id=${imgId}&file=${slideFolder}%2F${imgName}&registry=sam2-b`;
 
         const database_url = `${server}:10020/annotation`;
-        const createDB = `http://${database_url}/create?image_id=${imgId}`;
-        const getAnnotator = `http://${database_url}/annotators?image_id=${imgId}`;
-        const getLabels = `http://${database_url}/labels?image_id=${imgId}`;
-        const insert = `http://${database_url}/insert?image_id=${imgId}`;
-        const read = `http://${database_url}/read?image_id=${imgId}`;
-        const update = `http://${database_url}/update?image_id=${imgId}&item_id=`;
-        const deleteanno = `http://${database_url}/delete?image_id=${imgId}&item_id=`;
-        const search = `http://${database_url}/search?image_id=${imgId}`;
-        const stream = `ws://${database_url}/stream?image_id=${imgId}`;
-        const count = `http://${database_url}/count?image_id=${imgId}`;
+        const annoAPI = {
+            createDB: `http://${database_url}/create?image_id=${imgId}`,
+            getAnnotator: `http://${database_url}/annotators?image_id=${imgId}`,
+            getLabels: `http://${database_url}/labels?image_id=${imgId}`,
+            insert: `http://${database_url}/insert?image_id=${imgId}`,
+            read: `http://${database_url}/read?image_id=${imgId}`,
+            update: `http://${database_url}/update?image_id=${imgId}&item_id=`,
+            delete: `http://${database_url}/delete?image_id=${imgId}&item_id=`,
+            search: `http://${database_url}/search?image_id=${imgId}`,
+            stream: `ws://${database_url}/stream?image_id=${imgId}`,
+            countAnnos: `http://${database_url}/count?image_id=${imgId}`
+        }
 
         // Function to populate options dynamically
         function populateOptions(container, annotationLayer, annotatorsMap) {
@@ -104,17 +109,36 @@
         <input type="text" id="tag-input" size="20" placeholder="Enter smart label">
     </div>
     <div id="model-toolbar">
-        <button id="yolo" value="off" type="button">HDYolo</button>
-        <button id="showColor" value="off" type="button">Show Label Colors</button>
-    </div>
-    <div id="coords">
-        <label for="coordX">x:</label>
-        <input type="text" id="coordX" class="input-readonly" name="coordX" size="10" readonly>
-        <label for="coordY">y:</label>
-        <input type="text" id="coordY" class="input-readonly" name="coordY" size="10" readonly>
+        <div class="model-btn-grp btn-group">                  
+            <div class="dropdown-btn">
+                <button type="button" class="btn dropdown-toggle dropdown-toggle-split btn-sm model-btn btn-secondary" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+                <span class="sr-only">Toggle Dropdown</span>
+                </button>
+                <div class="dropdown-menu" aria-labelledby="modelSelector" style="">
+                    <a class="dropdown-item" href="#" onclick="selectModel({id: 'yolov8-lung', text: 'HDYolo-Lung', path: yoloAPI, annotator: 'yolov8-lung'})">HDYolo-Lung</a>
+                    <a class="dropdown-item" href="#" onclick="selectModel({id: 'yolov8-colon', text: 'HDYolo-Colon', path: yoloColonAPI, annotator: 'yolov8-colon'})">HDYolo-Colon</a>
+                </div>
+            </div>
+            <div id="modelDisplay" class="model-display model-display-secondary">HDYolo-Lung</div>
+                <div class="run-stop-btn">
+                    <button id="runStopButton" type="button" class="btn btn-sm model-btn btn-secondary">
+                        <i id="runStopIcon" class="fa fa-play"></i>
+                    </button>
+                </div>
+             </div>
+        </div>
+        <div id="other-toolbar">
+            <button id="showColor" value="off" type="button">Show Label Colors</button>
+        </div>
+        <div id="coords">
+            <label for="coordX">x:</label>
+            <input type="text" id="coordX" class="input-readonly" name="coordX" size="10" readonly>
+            <label for="coordY">y:</label>
+            <input type="text" id="coordY" class="input-readonly" name="coordY" size="10" readonly>
+        </div>
     </div>
 </div>
-
+<div class="mt-2 h6" id="color-legend"></div>
 <div id="layers" class="popup">
     <div class="popup-header">
         <h2>Select Annotators</h2>
@@ -158,24 +182,13 @@ $(function() {
         width: 1,
     });
 
-    var yoloBtn = document.getElementById("yolo");
-    yoloBtn.addEventListener("click", function () {
-        let nucleiImage = viewer.world.getItemAt(1);
-        if (yoloBtn.value == 'off') {
-            yoloBtn.value = 'on';
-            nucleiImage.setOpacity(1);
-            // If dropdown list is open, add row or check it.
-            // annotationLayer.addAnnotator('HDYolo');
-        } else {
-            yoloBtn.value = 'off';
-            nucleiImage.setOpacity(0);
-        }
-    });
+    const userPalette = "";
+    const mergedGlobalPalette = mergeColorPalettes(globalColorCodes, userPalette);
 
     // Create a ColorPalette
     var colorPalette = new ColorPalette(
         document.getElementById("showColor"),
-        globalColorCodes, '#E8E613',
+        mergedGlobalPalette, '#E8E613',
     );
 
     // Add a IViewerAnnotation Layer (Konva + Annotorious)
@@ -197,9 +210,109 @@ $(function() {
         colorPalette: colorPalette,
     });
 
-    annotationLayer.buildConnections(createDB, getAnnotator, getLabels, insert, read, update, deleteanno, search, stream, count);
+    buildConnections(annotationLayer, annoAPI);
     annotationLayer.enableEditing(userId);
     annotationLayer.draw(); // annotationLayer.hide();
+
+     //--- HDYolo models selecting ---
+    let modelIsRunning = false;
+    let currentModel = {
+        id: "yolov8-lung", 
+        text: "HDYolo-Lung", 
+        path: yoloAPI, 
+        annotator: "yolov8-lung"
+    };
+
+    function toggleRunning(start = true, toggleModel) {
+        const controlBtn = document.getElementById('runStopButton');
+        const runStopIcon = document.getElementById("runStopIcon");
+        const modelDisplay = document.getElementById('modelDisplay');
+        const splitButton = document.querySelector('.dropdown-toggle-split');
+
+        if (start) {
+            if (toggleModel) {
+                annotationLayer.addAnnotator(toggleModel.id);
+                    // layerQueuesCheckInterval = setInterval(checkViewportLevelAndDisplayHelpMessage, 1000);
+                addTile(viewer, toggleModel.path);
+                    // if ($("#floatingWindow-left").hasClass("ui-dialog-content")) {
+                    //     // The dialog is open, so close it
+                    //     $("#floatingWindow-left").dialog("close");
+                    // }
+                    // if ($("#floatingWindow-right").hasClass("ui-dialog-content")) {
+                    //     // The dialog is open, so close it
+                    //     $("#floatingWindow-right").dialog("close");
+                    // }
+            }
+            controlBtn.classList.remove('btn-secondary');
+            controlBtn.classList.add('btn-primary');
+            splitButton.classList.remove('btn-secondary');
+            splitButton.classList.add('btn-primary');
+            runStopIcon.classList.add('fa-stop')
+            runStopIcon.classList.remove('fa-play')
+            modelDisplay.classList.remove('model-display-secondary');
+            modelDisplay.classList.add('model-display-primary');
+            modelIsRunning = true;
+        } else {
+                // Stop the model
+            if(toggleModel){
+                    // clearInterval(layerQueuesCheckInterval); 
+                    // hideInstructions(helpMessage);
+                removeTile(viewer, toggleModel.path);
+            }
+            controlBtn.classList.remove('btn-primary');
+            controlBtn.classList.add('btn-secondary');
+            splitButton.classList.remove('btn-primary');
+            splitButton.classList.add('btn-secondary');
+            runStopIcon.classList.add('fa-play')
+            runStopIcon.classList.remove('fa-stop')
+            modelDisplay.classList.remove('model-display-primary');
+            modelDisplay.classList.add('model-display-secondary');
+            modelIsRunning = false;
+        }      
+    }   
+
+    function selectModel(model) {
+        if (modelIsRunning) {
+            const previousModel = currentModel;
+            toggleRunning(false, previousModel); 
+        }
+            // Update button text with gear icon
+        const div = document.getElementById('modelDisplay');
+        div.innerHTML = model.text;
+        currentModel = model;
+        console.log("curren model", currentModel.text)
+    }
+
+    //--- End of HDYolo models selecting ---
+
+
+    // var layerQueuesCheckInterval;
+    addTile = (viewer, regionalTile) => {
+        viewer.addTiledImage({
+            tileSource: regionalTile,
+            x: 0,
+            opacity: 0.5
+        });
+    }
+
+    removeTile = (viewer, tileName) => {
+    var count = viewer.world.getItemCount();
+    for (i = 0; i < count; i++) {
+        tiledImage = viewer.world.getItemAt(i);
+        if (tiledImage.source.queryParams.input === tileName) {
+            //set selected addedtileimage opacity to 0
+            tiledImage.setOpacity(0);
+            // viewer.world.removeItem(tiledImage);
+            break;
+            }
+        }
+    }
+
+    document.getElementById('runStopButton').addEventListener('click', function() {
+        console.log("runStopButton eventlistner")
+        toggleRunning(!modelIsRunning, currentModel);
+    });
+
 
     // Add a scale bar
     viewer.scalebar({

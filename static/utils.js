@@ -15,9 +15,9 @@ function generateButton(viewer) {
 
 function parseShape(ann) {
     // poly_x and poly_y are strings of comma-separated floats
-    let polyX = ann.poly_x.split(',');
-    let polyY = ann.poly_y.split(',');
-    if (ann.poly_x.length === 0 || ann.poly_y.length === 0) { // box and point
+    let polyX = ann.poly_x ? ann.poly_x.split(',') :[];
+    let polyY = ann.poly_y ? ann.poly_y.split(',') : [];
+    if ((!ann.poly_x || ann.poly_x.length === 0) && (!ann.poly_y || ann.poly_y.length === 0)) {// box and point
         let [x0, y0] = [parseFloat(ann.x0), parseFloat(ann.y0)];
         let [x1, y1] = [parseFloat(ann.x1), parseFloat(ann.y1)];
         if (x0 == x1 && y0 == y1) { // point
@@ -736,4 +736,22 @@ function sendMessageWithRetry(webSocket, query) {
         }
     }
     retrySend();
+}
+
+function buildConnections(layer, annoAPI) {
+    layer.buildConnections(
+        annoAPI.createDB, annoAPI.getAnnotator, annoAPI.getLabels,
+        annoAPI.insert, annoAPI.read, annoAPI.update, annoAPI.delete,
+        annoAPI.search, annoAPI.stream, annoAPI.countAnnos
+    );
+}
+
+// Function to merge global palette with user-specific palette
+function mergeColorPalettes(globalPalette, userPalette) {
+    return Object.keys(userPalette).length > 0 ? userPalette : globalPalette;
+}
+
+// Function to fetch user-specific color palette
+async function fetchColorPalette(imageId, userId) {
+    return ""
 }

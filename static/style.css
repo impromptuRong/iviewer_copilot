@@ -10,7 +10,7 @@ body {
 div#toolbars {
     position: relative;
     width: 100%;
-    height: 30px;  /*5%;*/
+    height: 50px;  /*5%;*/
     border: 1px solid;
     display: flex;
 }
@@ -28,7 +28,7 @@ div#view {
     top: 0;
     left: 0;
     width: 100%;
-    height: 95%;
+    height: 85%;
     background-color: black;
     color: white;
     border: 1px solid #000;
@@ -198,4 +198,159 @@ div#view.fullpage {
 .popUpButtons {
     display: flex;
     gap: 10px;
+}
+
+/* hdyolo button */
+
+.model-display {
+    display: flex; 
+    align-items: center; 
+    font-size: 0.875rem; 
+    font-weight: 400;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: middle;
+    border-radius: 0; 
+    border: 1px solid darkgray; 
+    background-color: #858796; 
+    color: white; 
+    height: 1.96rem; 
+    line-height: 2.125rem; 
+    padding: 2px 8px;
+  }
+  
+  /* New classes for dynamic background color */
+  .model-display-primary {
+    background-color: #4e73df;
+    color: white; 
+  }
+  
+  .model-display-secondary {
+    background-color: #858796; 
+    color: white;
+  }
+  .model-btn, 
+  .model-btn.btn-sm {
+      border-radius: 0 !important; 
+      border: 1px solid darkgray !important; 
+      padding: 12px;
+  }
+  
+  .model-btn-grp {
+    display: flex;
+    align-items: center;
+    /* margin-right: 35px; */
+  }
+  
+  .dropdown-btn, .model-display, .run-stop-btn {
+    margin: 0; 
+  }
+  .dropdown-btn {
+    margin-right: 0;
+  }
+  .btn.dropdown-toggle::after {
+    font-size: 1.0rem; 
+    vertical-align: middle; 
+  }
+  #runStopIcon {
+    font-size: 0.4rem; 
+  }
+  .colorPopUp {
+    position:absolute;
+    width: 300px;
+    height: auto;
+    background-color: #fff;  
+    border: 1px solid rgba(0, 0, 0, 0.125);  
+    border-radius: 0.25rem; 
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);  
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    padding: 15px;
+  }
+  
+  .colorPopUp h4 {
+    text-align: center;
+    background-color: #007bff; 
+    color: white;
+    padding: 10px;
+    border-top-left-radius: 0.25rem;
+    border-top-right-radius: 0.25rem;
+    margin-bottom: 15px;
+  }
+  .colorList {
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+    padding:10px 3px;
+  }
+  
+  .label-row {
+    display: flex;
+    align-items: center;
+    margin-bottom: 3px;
+  }
+  .label-checkbox {
+    margin-right: 10px;
+    transform: scale(1.3);
+    margin-left: 3px;
+  }
+  
+  .label-name {
+    flex: 1;
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 0.25rem;
+    margin-right: 3px;
+    font-size: 14px;
+  }
+  
+  .color-input {
+    padding: 0;
+    border: none;
+  }
+  
+  .popUpButtons {
+    margin-top: 15px;
+    display: flex; 
+    justify-content: flex-end; 
+    flex-wrap: nowrap; 
+  }
+  .popUpButtons button {
+    background-color: transparent; 
+    color: #007bff;
+    border: 2px solid #007bff; 
+    padding: 4px 5px; 
+    font-size: 12px; 
+    border-radius: 0.2rem; 
+    margin-right: 3px;
+    cursor: pointer;
+    transition: background-color 0.3s, color 0.3s;
+  }
+  
+  .popUpButtons button:hover {
+    background-color: #007bff; /* Primary color on hover */
+    color: white; /* White text on hover */
+  }
+  
+  .popUpButtons button:last-child {
+    background-color: transparent; /* No background color */
+    color: #dc3545; /* Bootstrap danger color for text */
+    border: 2px solid #dc3545; /* Red border */
+  }
+  
+  .popUpButtons button:last-child:hover {
+    background-color: #dc3545; /* Red background on hover */
+    color: white; /* White text on hover */
+  }
+
+  .legend-box{
+    width:20px;
+    height:10px;
+    display: inline-block;
+    /*font-size: 0.8rem;*/
+    /* margin-left: 10px; */
+    border: #3f3f3f 1px solid;
+    margin-right: 5px; 
+}
+
+.legend-text{
+    margin-right:10px;
 }
