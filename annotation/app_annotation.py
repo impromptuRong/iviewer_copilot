@@ -429,7 +429,7 @@ async def search_iterator(query, session):
             end_time = None
         if end_time:
             filters.append(Annotation.created_at < end_time)
-    
+
     if 'label' in query:
         if isinstance(query['label'], str):
             filters.append(Annotation.label == query['label'])
@@ -532,7 +532,7 @@ async def search_data_stream(websocket: WebSocket, image_id: str):
     async def get_query():
         data = await websocket.receive_text()
         return json.loads(data)
-    
+
     async def stream_items(query: Dict):
         # sleep 0.001s every 0.5s, cannot receive new query if don't sleep.
         sleep_interval = 0.5

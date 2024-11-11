@@ -31,7 +31,7 @@ def nuclei_composition_summary(entries):
         res = df['label'].value_counts().to_dict()
     else:
         res = {}
-    
+
     return res
 
 
@@ -120,7 +120,7 @@ def nuclei_scatter_plot(entries, roi, mpp=DEFAULT_MPP, classes=['tumor_nuclei', 
     x0, y0, x1, y1 = roi
     roi_size = y1 - y0, x1 - x0
     mpp_adjusted_roi_size = int(math.ceil(roi_size[0] * mpp_scale)), int(math.ceil(roi_size[1] * mpp_scale))
-    
+
     boxes = torch.tensor([(e['x0'], e['y0'], e['x1'], e['y1']) for e in entries if e['label'] in labels_mapping])
     labels = torch.tensor([labels_mapping[e['label']] for e in entries if e['label'] in labels_mapping])
     res_nuclei = {'boxes': (boxes - np.array([x0, y0, x0, y0])) * mpp_scale, 'labels': labels}

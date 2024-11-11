@@ -1,5 +1,4 @@
 import math
-import time
 import torch
 import torchvision
 import torch.nn.functional as F
@@ -14,8 +13,8 @@ import cv2
 import itertools
 # import multiprocessing as mp
 from functools import reduce
-from collections import Counter
-from scipy.signal import fftconvolve, convolve
+from collections import Counter, defaultdict
+from scipy.signal import convolve
 
 import matplotlib
 import skimage.morphology

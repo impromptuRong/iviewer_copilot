@@ -13,7 +13,7 @@ def resize_pil(img, output_size, keep_ratio=True, resample=Image.BILINEAR):
     if keep_ratio:
         factor = min(output_size[0] / w0, output_size[1] / h0)
         output_size = (int(w0 * factor), int(h0 * factor))
-    
+
     return img.resize(output_size, resample=resample)
 
 def pil2bytes(img, format=None, default_format='PNG'):
@@ -22,7 +22,7 @@ def pil2bytes(img, format=None, default_format='PNG'):
     img.save(buff, format=format)
     image_bytes = buff.getvalue()
     # print(f"image size: {sys.getsizeof(image_bytes)/1048576} mb.")
-    
+
     return image_bytes, format
 
 def bytes2pil(img_bytes):
@@ -35,7 +35,7 @@ class OllamaClient:
         # print(self.client.list())
         self.configs = configs
         self.load_model(configs)
-    
+
     def load_model(self, configs):
         self.model = configs.get('model', 'llama3')
         # messages = [{'role': 'user', 'content': 'say hi'}]
@@ -48,7 +48,7 @@ class OllamaClient:
         except Exception as e:  # ollama.ResponseError as e:
             print('Error:', e)
             return False
-    
+
     def stream(self, messages, options={}):
         print(options)
         stream = self.client.chat(
@@ -57,12 +57,12 @@ class OllamaClient:
             stream=True,
             options=options,
         )
-        
+
         for chunk in stream:
             fragment = chunk['message']['content']
             # print(fragment, end='', flush=True)
             yield fragment
-    
+
     def chat(self, messages, options={}):
         response = self.client.chat(
             model=self.model, 
@@ -101,7 +101,7 @@ class OllamaClient:
                 img_bytes, _ = pil2bytes(img, format='jpeg')
                 img_encoded = base64.b64encode(img_bytes)
                 images_encoded.append(img_encoded)
-            
+
             user_content['images'] = images_encoded
 
         messages.append(user_content)
@@ -126,7 +126,7 @@ class GPTClient:
             stream=True,
             **options,
         )
-        
+
         for chunk in stream:
             fragment = chunk.choices[0].delta.content
             if fragment is not None:
@@ -140,7 +140,7 @@ class GPTClient:
             stream=False,
             **options,
         )
-        
+
         return response.choices[0].message.content
     
     def build_messages(self, prompt, system=None, history=None, 
@@ -152,7 +152,7 @@ class GPTClient:
                 'role': 'system',
                 'content': system, 
             })
-        
+
         if history:
             for user_info, agent_info in history:
                 messages.append({'role': 'user', 'content': user_info})
@@ -162,7 +162,6 @@ class GPTClient:
             {"type": "text", "text": prompt,},
         ]
         if images:
-            images_encoded = []
             image_size = self.configs.get('image_size')
             for img in images:
                 if resize_image and image_size:
@@ -170,7 +169,7 @@ class GPTClient:
                 img_bytes, image_type = pil2bytes(img, format='jpeg')
                 img_encoded = base64.b64encode(img_bytes)                
                 user_content.append({"type": "image_url", "image_url": {"url": f"data:image/{image_type};base64,{img_encoded.decode('utf-8')}",}})
-        
+
         messages.append({"role": "user", "content": user_content,})
 
         return messages

@@ -18,7 +18,7 @@ def approx_poly_epsilon(contour, factor=0.01):
     # area = cv2.contourArea(contour)
     perimeter = cv2.arcLength(contour, True)
     # Define a factor to control the trade-off between detail and simplification
-    
+
     epsilon = max(factor * perimeter, 0.5)  # * (1 + area / perimeter)
     # print({'area': area, 'perimeter': perimeter, 'epsilon': epsilon})
     return epsilon
@@ -27,7 +27,7 @@ def approx_poly_epsilon(contour, factor=0.01):
 def masks2segments(masks, output_shape=None, strategy='largest', approx=False):
     """ modify from ultralytics.utils.ops.masks2segments. """
     segments = []
-    
+
     if output_shape is not None:
         h_scale = output_shape[0]/masks.shape[-2]
         w_scale = output_shape[1]/masks.shape[-1]
@@ -267,7 +267,7 @@ def export_detections_to_table(res, labels_text=None, save_masks=True):
 
         df['poly_x'] = poly_x
         df['poly_y'] = poly_y
-    
+
     return pd.DataFrame(df)
 
 

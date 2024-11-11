@@ -143,7 +143,7 @@ class DeepZoomGenerator:
         if level < 0 or level >= self._dz_levels:
             raise ValueError(f"Invalid level {level}")
         col, row = address
-        
+
         # Get preferred slide page
         page, coords_osr, coords_dzi = self.page_tile_indices[level]
         coord, (w, h) = coords_osr[row][col], coords_dzi[row][col][2:]

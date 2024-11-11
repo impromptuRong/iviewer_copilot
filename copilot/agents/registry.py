@@ -12,17 +12,17 @@ class ModelRegistry:
     __entry__ = ['caption', 'chatbot', 'rag']
     def __init__(self):
         self._registry = {k: {} for k in self.__entry__}
-    
+
     def register(self, entry, name, client):
         assert entry in self.__entry__
         self._registry[entry][name] = client
 
     def get_caption_model(self, name):
         return self._registry['caption'].get(name)
-    
+
     def get_chatbot_model(self, name):
         return self._registry['chatbot'].get(name)
-    
+
     def get_rag_model(self, name):
         return self._registry['rag'].get(name)
 
@@ -122,7 +122,7 @@ class AgentModel(BaseModel):
 
     class Config:
         arbitrary_types_allowed = True
-    
+
     @field_validator('fn')
     def validate_function(cls, v):
         if not callable(v):
@@ -264,7 +264,7 @@ class AgentRegistry:
                            output_mapping=output_mapping, description=description,
                            return_direct=return_direct,
                           )
-    
+
     def get_function(self, name: str) -> Callable[..., Any]:
         """
         Return a call function wrapper(**kwargs)
@@ -290,7 +290,7 @@ class AgentRegistry:
         fn_name = name
         if fn_name not in self.registry:
             raise ValueError(f"Function {fn_name} is not registered.")
-        
+
         fn_info = self.registry[fn_name]
         fn = fn_info['function']
         input_mapping = fn_info['input_mapping']
@@ -298,7 +298,7 @@ class AgentRegistry:
         sig = fn_info['signature']
         InputModel = fn_info['input_model']
         OutputModel = fn_info['output_model']
-        
+
         def wrapper(**kwargs):
             # if all outputs are already in cache, directly return result
             # print(f"-------- Function called: {fn_name}")
@@ -309,7 +309,7 @@ class AgentRegistry:
                 return output  # OutputModel(**output)
             else:
                 print(f"Cannot directly fetch result for {missing_nodes} from cache. Recalculate results for agent: {fn_name}")
-            
+
             ## LLM tend to auto parse useless information. We explicitly update nodes through update_cache
             for k, v in kwargs.items():
                 if k in self.registered_nodes and k not in self.cache and self.registered_nodes[k]['as_fn_output'] is None:
@@ -362,7 +362,7 @@ class AgentRegistry:
             # Validate input using Pydantic model and execute the function
             inputs = InputModel(**fn_kwargs)
             result = fn(**inputs.model_dump())
-            
+
             # Store the result in cache and validate with OutputModel
             for position_or_name, node_name in output_mapping.items():
                 if position_or_name is None:
@@ -373,7 +373,7 @@ class AgentRegistry:
             output = {node_name: self.cache[node_name] for node_name in output_mapping.values()}
 
             return output  # OutputModel(**output)
-        
+
         wrapper.__signature__ = fn_info['signature']
 
         return wrapper

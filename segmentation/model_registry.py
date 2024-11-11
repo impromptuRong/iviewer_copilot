@@ -4,14 +4,14 @@ class ModelRegistry:
     __entry__ = ['model', 'generator']
     def __init__(self):
         self._registry = {k: {} for k in self.__entry__}
-    
+
     def register(self, name, entry, cls):
         assert entry in self.__entry__
         self._registry[entry][name] = cls
 
     def get_model(self, name):
         return self._registry['model'].get(name)
-    
+
     def get_generator(self, name):
         return self._registry['generator'].get(name)
 

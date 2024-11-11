@@ -1,21 +1,10 @@
 import os
-import sys
-import math
-import time
-import random
-import pickle
-import numbers
-import skimage
-import datetime
-
-
 import cv2
-import numpy as np
-import pandas as pd
-import multiprocessing as mp
-
+import datetime
 import tifffile
-from .utils_image import Slide, get_dzi, img_as, pad, Mask, overlay_detections, pad_pil, polygon_areas
+import numpy as np
+
+from .utils_image import get_dzi, img_as, pad, pad_pil
 
 
 def load_cfg(cfg):
@@ -79,7 +68,7 @@ def processor(patch, info, **kwargs):
 def generate_roi_masks(slide, masks='tissue'):
     if isinstance(masks, str):
         if masks == 'tissue':
-            res = slide.roughly_extract_tissue_region((512, 512), bg=255)
+            res = slide.roughly_extract_tissue_region((1024, 1024), bg=255)
         elif masks == 'all':
             res = None
         elif masks == 'xml':

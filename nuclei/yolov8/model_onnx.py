@@ -128,7 +128,7 @@ class Yolov8SegmentationONNX:
             res.append(o)
 
         return res
-    
+
     def convert_results_to_annotations(self, output, patch_info, annotator=None, extra={}):
         output = map_coords(output, patch_info)
 

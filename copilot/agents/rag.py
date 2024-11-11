@@ -48,7 +48,7 @@ class RAGRouter:
                     'description': cfg.get('description', f"This is a agent for {name}"),
                     'return_direct': cfg.get('return_direct', False),
                 }
-        
+
         return cls(agents, llm=llm, similarity_top_k=similarity_top_k, llm_cfgs=llm_cfgs)
 
     def register_agent(self, name: str, type: str, entrypoint: Any, description: str='', return_direct: bool=False, **kwargs) -> None:

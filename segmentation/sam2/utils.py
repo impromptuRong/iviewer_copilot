@@ -1,8 +1,5 @@
 import cv2
-import time
-import numbers
 import torch
-import numpy as np
 import pandas as pd
 
 from PIL import Image
@@ -17,25 +14,10 @@ def approx_poly_epsilon(contour, factor=0.01):
     # area = cv2.contourArea(contour)
     perimeter = cv2.arcLength(contour, True)
     # Define a factor to control the trade-off between detail and simplification
-    
+
     epsilon = max(factor * perimeter, 0.5)  # * (1 + area / perimeter)
     # print({'area': area, 'perimeter': perimeter, 'epsilon': epsilon})
     return epsilon
-
-
-def map_coords(r, patch_info):
-    # trim border objects, map to original coords
-    # patch_info: [x0_s, y0_s, w_p(w_s), h_p(h_s), pad_w(x0_p), pad_h(y0_p)]
-    x0_s, y0_s, w_p, h_p, x0_p, y0_p = patch_info
-
-    res = {k: r[k][keep] for k in ['boxes', 'labels', 'scores']}
-    res['boxes'][:, [0, 2]] += x0_s - x0_p
-    res['boxes'][:, [1, 3]] += y0_s - y0_p
-    if 'masks' in r:
-        res['masks'] = [m + [x0_s - x0_p, y0_s - y0_p] 
-                        for m, tag in zip(r['masks'], keep) if tag]
-
-    return res
 
 
 def export_detections_to_table(res, labels_text=None, save_masks=True):
@@ -55,7 +37,7 @@ def export_detections_to_table(res, labels_text=None, save_masks=True):
 
         df['poly_x'] = poly_x
         df['poly_y'] = poly_y
-    
+
     return pd.DataFrame(df)
 
 

@@ -20,7 +20,7 @@ class SAM2Segmentation:
         s0 = time.time()
         if preprocess:
             image, _ = self.preprocess(image)
-        
+
         s1 = time.time()
         if 'bboxes' in prompts:
             r = self.model(image, bboxes=prompts['bboxes'], verbose=False, save=False)[0]  # Segment with bounding box prompt

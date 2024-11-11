@@ -2,9 +2,10 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
+COPY deepzoom/requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 COPY deepzoom/. .
 COPY utils ./utils
-RUN pip install --no-cache-dir -r requirements.txt
 
 RUN export no_proxy="localhost"
 

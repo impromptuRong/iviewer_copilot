@@ -152,7 +152,7 @@ def get_patch_and_prompts(file, item, image_size=(512, 512)):
         scale_w, scale_h = scale_w / factor, scale_h / factor
     else:
         scale_w, scale_h = scale_w * 1.0, scale_h * 1.0
-    
+
     # Map all coordinates to the selected level
     x0_scaled, y0_scaled = int(x0 * scale_w), int(y0 * scale_h)
     w_scaled, h_scaled = int(math.ceil(w * scale_w)), int(math.ceil(h * scale_h))
