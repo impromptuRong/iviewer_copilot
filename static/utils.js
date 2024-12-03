@@ -67,12 +67,12 @@ function parseDatabaseAnnotation(ann, colorPalette) {
 
     return {
         id: ann.id,
-        label: ann.label,
-        description: ann.description,
-        annotator: ann.annotator,
-        project_id: ann.project_id,
-        group_id: ann.group_id,
-        created_at: ann.created_at,
+        label: ann.label || '',
+        description: ann.description || '',
+        annotator: ann.annotator || '',
+        project_id: ann.project_id || '',
+        group_id: ann.group_id || '',
+        created_at: ann.created_at || '',
         fill: color['face'],
         stroke: color['border'],
         strokeWidth: 2,
