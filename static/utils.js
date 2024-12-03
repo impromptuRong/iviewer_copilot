@@ -134,7 +134,7 @@ function konva2w3c(selectedShape) {
     const { id, label, annotator, description, created_at} = selectedShape.attrs;
     // const bbox = { x0: selectedShape.ann.x0, y0: selectedShape.ann.y0, x1: selectedShape.ann.x1, y1: selectedShape.ann.y1 };
 
-    let labelArray = label.split(',');
+    let labelArray = (label || '').split(',');
     let taggingResult = [];
     if (labelArray.length > 0 && labelArray[0] !== "") {
         for (let item of labelArray) {
