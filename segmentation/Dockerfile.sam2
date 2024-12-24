@@ -4,6 +4,9 @@ WORKDIR /app
 
 COPY segmentation/requirements_worker.txt .
 RUN pip install --no-cache-dir -r requirements_worker.txt
+RUN pip uninstall -y opencv-python
+RUN pip install --no-cache-dir opencv-python-headless
+
 COPY segmentation/. .
 COPY utils ./utils
 
@@ -15,6 +18,5 @@ RUN python -m wget -o /app/ckpts/ultralytics/sam2_b.pt https://github.com/ultral
 
 RUN pip install python-multipart
 
-# CMD ["celery", "-A", "app_worker.celery", "worker", "--loglevel=info", "-Q", "sam2-b"]
-RUN nohup celery -A app_worker.celery worker --loglevel=info -Q sam2-b > z.sam2_b.log &
-CMD ["python", "app_queue.py"]
+CMD ["celery", "-A", "app_worker.celery", "worker", "--loglevel=info", "-Q", "sam2-b"]
+# RUN nohup celery -A app_worker.celery worker --loglevel=info -Q sam2-b > z.sam2_b.log &

@@ -15,13 +15,11 @@ from utils.simpletiff import SimpleTiff
 from utils.utils_image import Slide
 from utils.utils_image import random_sampling_in_polygons
 
+from app_worker import run_segmentation
+
 # from model_registry import AGENT_CONFIGS
 
 DEFAULT_INPUT_SIZE = (512, 512)
-SEGMENT_HOST = os.environ.get('SEGMENT_HOST', 'localhost')
-SEGMENT_PORT = os.environ.get('SEGMENT_PORT', 8376)
-SEGMENT_SERVER = f'http://{SEGMENT_HOST}:{SEGMENT_PORT}'
-
 
 app = FastAPI()
 app.add_middleware(
@@ -170,30 +168,30 @@ def image_to_bytes(image: Image):
 
 
 @app.post("/segment")
-async def segment(image_id, file, registry, item=Body(...)):
-    # key = f"{image_id}_{registry}"
+async def segment(image_id: str, file: str, registry: str, item=Body(...)):
+    key = f"{image_id}_{registry}"
     # if registry not in AGENT_CONFIGS:
     #     raise HTTPException(status_code=400, detail=f"Unknown model registry: {registry}")
     # config = AGENT_CONFIGS[registry]
 
     patch, prompts, patch_info = get_patch_and_prompts(file, item, DEFAULT_INPUT_SIZE)
-    # task = run_segmentation.apply_async(args=[image_to_bytes(patch), prompts, patch_info, {}], queue=registry)
-
-    # Send the POST request to the GPU server
-    files = {'image': ('image.png', image_to_bytes(patch), 'image/png')}
-    data = {'prompts': prompts, 'patch_info': patch_info, 'extra': {}}
-    response = requests.post(
-        f"{SEGMENT_SERVER}/segment?registry={registry}", 
-        files=files, data={'params': json.dumps(data)},
+    # Enqueue the task to Celery
+    task = run_segmentation.apply_async(
+        args=[image_to_bytes(patch), prompts, patch_info, {}], 
+        queue=registry,
     )
 
-    if response.status_code == 200:
-        return response.json()  # The task ID and status from the GPU server
-    else:
-        raise Exception(f"Failed to send task: {response.content}")
+    try:
+        result = task.get(timeout=20)  # Set timeout to avoid long waits
+        # {"task_id": task.id, "status": "Task submitted"}
+        return result
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Task failed: " + str(e))
 
 
 if __name__ == "__main__":
     # asyncio.run(test_connection())
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=9050)
+

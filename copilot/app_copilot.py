@@ -349,7 +349,7 @@ with gr.Blocks(css=css) as demo:
 
 app = FastAPI()
 demo.queue(default_concurrency_limit=10)
-app = gr.mount_gradio_app(app, demo, path="/copilot")
+app = gr.mount_gradio_app(app, demo, path="/copilot", root_path="/copilot")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Adjust the allowed origins as needed

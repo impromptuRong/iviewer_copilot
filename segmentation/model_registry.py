@@ -15,9 +15,9 @@ class ModelRegistry:
     def get_generator(self, name):
         return self._registry['generator'].get(name)
 
-    def load_service(self, config, test=False):
+    def load_service(self, config, device='cpu', test=False):
         service = self.get_model(config.server)(
-            config, device=config.device
+            config, device=device,
         )
         if test:
             service.test_run()

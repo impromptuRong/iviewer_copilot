@@ -22,6 +22,7 @@ celery.conf.update(
 
 service = None  # Global model variable
 registry = os.getenv('MODEL_REGISTRY', 'sam2-b')
+device = os.getenv('MODEL_DEVICE', 'cpu')
 
 @worker_process_init.connect
 def load_model(**kwargs):
@@ -29,9 +30,8 @@ def load_model(**kwargs):
     assert registry in AGENT_CONFIGS, f"AGENT_CONFIGS do not have registry: {registry}."
 
     config = AGENT_CONFIGS[registry]
-    service = MODEL_REGISTRY.load_service(config)    
-    service.test_run(image='000000039769.jpg')
-    print(f"Load model {registry} and test run success!")
+    service = MODEL_REGISTRY.load_service(config, device=device, test=True)
+    print(f"Load model {registry} and test run on {service.model.device} success!")
 
 @celery.task(bind=True)
 def run_segmentation(self, image_bytes, prompts, patch_info, extra):
