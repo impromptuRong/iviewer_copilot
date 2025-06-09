@@ -8,7 +8,7 @@ from datetime import datetime
 from async_lru import alru_cache
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException, Request, Body, Response, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Request, Body, Response, Depends, WebSocket, WebSocketDisconnect, status
 
 from sqlalchemy import or_, and_
 from sqlalchemy import select, delete, update, insert
@@ -16,7 +16,8 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from fastapi.middleware.cors import CORSMiddleware
 
 from utils.db import Base, Annotation, Cache
-
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import SQLAlchemyError
 
 app = FastAPI()
 app.add_middleware(
@@ -80,6 +81,44 @@ async def get_session(image_id):
     finally:
         await session.close()
 
+async def check_database() -> dict:
+    try:
+        db_path = os.path.join(DATABASE_DIR, "test.db")
+        database_url = f"sqlite+aiosqlite:///{db_path}"
+        engine = create_async_engine(database_url, echo=True)
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        await engine.dispose()  
+        return {"success": True}
+    except SQLAlchemyError as e:
+        return {"success": False, "error": str(e)}
+
+@app.get("/health")
+async def health_check():
+    db_status = await check_database()  # Use await for async function
+    if db_status["success"]:
+        return JSONResponse(
+            content={
+                "health": "OK",
+                "details": "Connection to the database is healthy, and tables can be created as needed.",
+                "environment": {
+                    "http_proxy": os.getenv("http_proxy"),
+                    "https_proxy": os.getenv("https_proxy"),
+                    "no_proxy": os.getenv("no_proxy"),
+                }
+            },
+            status_code=status.HTTP_200_OK
+        )
+    else:
+        # If there was an error, return the error message in the response
+        return JSONResponse(
+            content={
+                "health": "Service is running, but the database connection failed or is unreachable.",
+                "details": db_status.get("error")
+            },
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
 
 @app.post("/annotation/create")
 async def create_table(image_id: str, client=Depends(get_redis)):

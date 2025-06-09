@@ -11,14 +11,20 @@ from functools import lru_cache
 
 from agents.utils.simpletiff import SimpleTiff
 from agents.utils.utils_image import Slide
+from tifffile import TiffFile
 
 from llm_config import MODEL_REGISTRY, SYSTEM_PROMPT, RAG_PROMPT
 from agents import AgentRegistry, RAGRouter, resize_pil
+from fastapi import FastAPI, HTTPException, Request, Response, Depends
+from fastapi.responses import JSONResponse
+import subprocess
+
 
 ## Image Caption, LLM, RAG Registries
 init_nodes = {'image', 'roi', 'mpp', 'core_nuclei_types', 'annotations', 'description',}
 PATCH_SIZE = (512, 512)
-
+OLLAMA_HOST_LLM = os.environ.get('OLLAMA_HOST_LLM', 'localhost')
+OLLAMA_PORT_LLM = os.environ.get('OLLAMA_PORT_LLM', '11434')
 ## TODO: 
 # 1. Implement MultimodalTextbox: https://www.gradio.app/docs/gradio/multimodaltextbox
 # 2. Keep ChatHistory: https://www.gradio.app/guides/multimodal-chatbot-part1
@@ -35,9 +41,16 @@ database_hostname = f"http://{annotation_hostname}:{annotation_port}"
 def _get_slide(slide_path):
     try:
         print(f"Excute remote slide: {slide_path}")
-        osr = SimpleTiff(slide_path)
+        if slide_path.startswith('http'):
+            print(f"Use SimpleTiff")
+            osr = SimpleTiff(slide_path)
+            engine = 'simpletiff'
+        else:
+            print(f"Use TiffFile")
+            osr = TiffFile(slide_path)
+            engine = 'tifffile'
         slide = Slide(osr)
-        slide.attach_reader(osr, engine='simpletiff')
+        slide.attach_reader(osr, engine=engine)
 
         return slide
     except Exception as e:
@@ -162,8 +175,13 @@ def generate_comment(comment, agent_state, request: gr.Request):
                 # print(chunk, end='', flush=True)
                 msg[0][-1] += chunk
                 yield msg, msg[0][-1]
-        except:
-            msg[0][-1] += f"Failed to generate image captions with MLLM agents."
+                
+        except Exception as e:
+            # msg[0][-1] += f"Failed to generate image captions with MLLM agents."
+            import traceback
+            error_msg = f"MLLM Error: {str(e)}\nTraceback: {traceback.format_exc()}"
+            print(error_msg)
+            msg[0][-1] += f"\n\nError generating captions: {str(e)}"
             yield msg, msg[0][-1]
 
         ## Run nuclei summary agents
@@ -357,6 +375,57 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+@app.get("/health")
+async def check_health(request: Request):
+    # return JSONResponse(content={"status": "healthy", "message": "Service is running!"})
+    try:
+        health_check = "OK"  
+       # Get environment variables from Docker build args
+        url = f"http://{OLLAMA_HOST_LLM}:{OLLAMA_PORT_LLM}"
+        
+        # Check connection using a POST request with payload
+        curl_response = check_connection(url, method="GET")
+        status_response = {
+            "health": health_check,
+            "environment": {
+                "http_proxy": os.getenv("http_proxy"),
+                "https_proxy": os.getenv("https_proxy"),
+                "no_proxy": os.getenv("no_proxy"),
+            },
+            "details": f"Test connection to Ollama URL: {url}, Output: {curl_response['output']}"
+        }
+        return JSONResponse(content=status_response)
+    except Exception as e:
+         return JSONResponse(
+            content={
+                "health": "unhealthy",
+                "details": f"Error: {str(e)}"
+            },
+            status_code=500  # Internal Server Error
+        )
+
+def check_connection(url:str, method: str = "GET", data: str = None):
+    """Check the connection using curl"""
+    try:
+        curl_command = [
+            'curl',
+            '-X', method.upper(),
+            url
+        ]
+        
+        if data and method.upper() == "POST":
+            curl_command.extend([
+                "-H", "Content-Type: application/json",
+                "-d", data
+            ])     
+        result= subprocess.run(curl_command, capture_output= True, text=True)
+        if result.returncode == 0:
+            return {"success": True, "output": result.stdout}
+        else:
+            return {"success": False, "output": result.stderr}
+    
+    except Exception as e:
+        return {"success": False, "output": f"Error: {str(e)}"}
 
 
 if __name__ == "__main__":

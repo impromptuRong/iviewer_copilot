@@ -121,6 +121,9 @@ services:
     build:
       context: .
       dockerfile: ./copilot/Dockerfile
+      args:
+        http_proxy: ${http_proxy}
+        https_proxy: ${https_proxy}
     ports:
       - "10040:9040"
     depends_on:
@@ -175,8 +178,12 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - SEGMENT_HOST=${SEGMENT_HOST}
+      - SEGMENT_PORT=${SEGMENT_PORT}
 
+# ONLY include these when using local gpu
   sam2:
+    profiles: ['local-gpu']
     image: iviewer-sam2:latest
     container_name: iviewer-sam2
     build:
@@ -193,4 +200,5 @@ services:
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - MODEL_DEVICE=${SEGMENT_DEVICE}
 

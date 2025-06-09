@@ -16,12 +16,29 @@ from utils.utils_image import Slide
 from utils.utils_image import random_sampling_in_polygons
 
 from app_worker import run_segmentation
+from fastapi import FastAPI, HTTPException, Request, Response, Depends
+from fastapi.responses import JSONResponse
+from fastapi import HTTPException
+
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    SEGMENT_HOST = os.getenv('SEGMENT_HOST')
+    if not SEGMENT_HOST:
+        raise RuntimeError("SEGMENT_HOST must be defined!")
+    
+    if SEGMENT_HOST == "sam2":
+        if not os.getenv('REDIS_HOST'):
+            raise RuntimeError("Redis config required for local mode")
+        
+    yield
 
 # from model_registry import AGENT_CONFIGS
 
 DEFAULT_INPUT_SIZE = (512, 512)
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Adjust the allowed origins as needed
@@ -166,7 +183,37 @@ def image_to_bytes(image: Image):
     img_byte_arr = img_byte_arr.getvalue()
     return img_byte_arr
 
+@app.get("/health")
+async def check_health(request: Request):
+    # return JSONResponse(content={"status": "healthy", "message": "Service is running!"})
+    try:
+        health_check = "OK"  
+       # Get environment variables from Docker build args
+        status_response = {
+            "health": health_check,
+            "environment": {
+                "http_proxy": os.getenv("http_proxy"),
+                "https_proxy": os.getenv("https_proxy"),
+                "no_proxy": os.getenv("no_proxy"),
+            }
+        }
+        return JSONResponse(content=status_response)
+    except Exception as e:
+         return JSONResponse(
+            content={
+                "health": "unhealthy",
+                "details": f"Error: {str(e)}"
+            },
+            status_code=500  # Internal Server Error
+        )
 
+SEGMENT_HOST = os.environ.get('SEGMENT_HOST')
+SEGMENT_PORT = os.environ.get('SEGMENT_PORT', 8376)
+USE_LOCAL = SEGMENT_HOST == 'sam2'
+
+if USE_LOCAL:
+    from app_worker import run_segmentation
+    
 @app.post("/segment")
 async def segment(image_id: str, file: str, registry: str, item=Body(...)):
     key = f"{image_id}_{registry}"
@@ -175,20 +222,36 @@ async def segment(image_id: str, file: str, registry: str, item=Body(...)):
     # config = AGENT_CONFIGS[registry]
 
     patch, prompts, patch_info = get_patch_and_prompts(file, item, DEFAULT_INPUT_SIZE)
+    
+    if USE_LOCAL:
     # Enqueue the task to Celery
-    task = run_segmentation.apply_async(
-        args=[image_to_bytes(patch), prompts, patch_info, {}], 
-        queue=registry,
-    )
+        task = run_segmentation.apply_async(
+            args=[image_to_bytes(patch), prompts, patch_info, {}], 
+            queue=registry,
+        )
 
-    try:
-        result = task.get(timeout=20)  # Set timeout to avoid long waits
-        # {"task_id": task.id, "status": "Task submitted"}
-        return result
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail="Task failed: " + str(e))
-
+        try:
+            result = task.get(timeout=20)  # Set timeout to avoid long waits
+            # {"task_id": task.id, "status": "Task submitted"}
+            return result
+        except Exception as e:
+            print(e)
+            raise HTTPException(status_code=500, detail="Task failed: " + str(e))
+    else:
+        # Remote processing via HTTP
+        files = {'image':('image.png', image_to_bytes(patch), 'image/png')}
+        data = {'params': json.dumps({'prompts': prompts, 'patch_info': patch_info, 'extra': {}})}
+        try:
+            response = requests.post(
+                f'http://{SEGMENT_HOST}:{SEGMENT_PORT}/segment?registry={registry}',
+                files=files,
+                data=data,
+                timeout=30
+            )
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            raise HTTPException(status_code=500, detail=f"Remote processing failed: {str(e)}")
 
 if __name__ == "__main__":
     # asyncio.run(test_connection())

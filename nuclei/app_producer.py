@@ -12,8 +12,10 @@ import numpy as np
 
 from utils.db import DeepZoomSettings
 from utils.simpletiff import SimpleTiff
+from tifffile import TiffFile
 from utils.utils_image import Slide, pad_pil
 from model_registry import MODEL_REGISTRY, AGENT_CONFIGS
+from fastapi.responses import JSONResponse
 
 
 # Redis connection
@@ -43,16 +45,19 @@ setting_cache = Cache(
     timeout=5,           # Set the cache timeout (in seconds)
 )
 
-
 @alru_cache(maxsize=8)
 async def _get_slide(slide_path):
     try:
         print(f"Excute remote slide: {slide_path}")
-        slide = SimpleTiff(slide_path)
+        if slide_path.startswith('http'):
+            print(f"Use SimpleTiff")
+            slide = SimpleTiff(slide_path)
+        else:
+            print(f"Use TiffFile")
+            slide = TiffFile(slide_path)
         return slide
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Failed to load slide from {slide_path}: {str(e)}")
-
 
 @alru_cache(maxsize=16)
 async def _get_generator(key):
@@ -61,10 +66,12 @@ async def _get_generator(key):
         osr = await _get_slide(settings.file)
 
         slide = Slide(osr)
-        slide.attach_reader(osr, engine='simpletiff')
+        engine = 'simpletiff' if settings.file.startswith('http') else 'tifffile'
+        print(f"use engine={engine}")
+        slide.attach_reader(osr, engine=engine)
 
         generator = MODEL_REGISTRY.get_generator(settings.server)(
-            slide, 
+            slide,
             tile_size=settings.tile_size,
             overlap=settings.overlap,
             # limit_bounds=settings.limit_bounds,
@@ -75,6 +82,29 @@ async def _get_generator(key):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Failed to get DeepZoomGenerator for {key}: {str(e)}")
 
+@app.get("/health")
+async def check_health(request: Request):
+    # return JSONResponse(content={"status": "healthy", "message": "Service is running!"})
+    try:
+        health_check = "OK"  
+       # Get environment variables from Docker build args
+        status_response = {
+            "health": health_check,
+            "environment": {
+                "http_proxy": os.getenv("http_proxy"),
+                "https_proxy": os.getenv("https_proxy"),
+                "no_proxy": os.getenv("no_proxy"),
+            }
+        }
+        return JSONResponse(content=status_response)
+    except Exception as e:
+         return JSONResponse(
+            content={
+                "health": "unhealthy",
+                "details": f"Error: {str(e)}"
+            },
+            status_code=500  # Internal Server Error
+        )
 
 @app.get("/proxy/dummy.dzi")
 async def proxy_dzi(request: Request):

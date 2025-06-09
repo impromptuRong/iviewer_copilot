@@ -12,6 +12,7 @@ from utils.db import DeepZoomSettings
 from utils.simpletiff import SimpleTiff
 from utils.deepzoom import DeepZoomGenerator
 from utils.utils_image import Slide
+from fastapi.responses import JSONResponse
 
 
 app = FastAPI()
@@ -118,6 +119,35 @@ async def _get_generator(key):
     except Exception as e:
         raise HTTPException(status_code=404, detail=f"Failed to get DeepZoomGenerator for {key}: {str(e)}")
 
+@app.get("/health")
+async def check_health(request: Request):
+    # return JSONResponse(content={"status": "healthy", "message": "Service is running!"})
+    try:
+        health_check = "OK"  
+        #proxies = {
+            #"http": os.getenv("http_proxy"),
+            #"https": os.getenv("https_proxy"),
+        #}
+        status_response = {
+            "health": health_check,
+            "environment": {
+                "http_proxy": os.getenv("http_proxy"),
+                "https_proxy": os.getenv("https_proxy"),
+                "no_proxy": os.getenv("no_proxy"),
+            }
+            #"network": {
+                #"ollama": check_service_status("http://ollama.example.com/health", proxies),
+            #},
+        }
+        return JSONResponse(content=status_response)
+    except Exception as e:
+         return JSONResponse(
+            content={
+                "health": "unhealthy",
+                "details": f"Error: {str(e)}"
+            },
+            status_code=500  # Internal Server Error
+        )
 
 @app.get("/proxy/params")
 async def proxy_params(request: Request):

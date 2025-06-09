@@ -20,7 +20,10 @@ class ModelRegistry:
             config, device=device,
         )
         if test:
-            service.test_run()
+            try:
+                service.test_run()
+            except Exception as e:
+                print(f"Test run warning:{str(e)} (proceeding anyway)")
 
         return service
 

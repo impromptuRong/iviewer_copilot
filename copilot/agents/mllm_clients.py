@@ -5,7 +5,6 @@ import ollama
 from PIL import Image
 from io import BytesIO
 
-
 def resize_pil(img, output_size, keep_ratio=True, resample=Image.BILINEAR):
     w0, h0 = img.size
     if w0 == output_size[0] and h0 == output_size[1]:
@@ -99,7 +98,7 @@ class OllamaClient:
                 if resize_image and image_size:
                     img = resize_pil(img, image_size, keep_ratio=True)
                 img_bytes, _ = pil2bytes(img, format='jpeg')
-                img_encoded = base64.b64encode(img_bytes)
+                img_encoded = base64.b64encode(img_bytes).decode('utf-8')
                 images_encoded.append(img_encoded)
 
             user_content['images'] = images_encoded
